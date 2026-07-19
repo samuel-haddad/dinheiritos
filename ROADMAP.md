@@ -85,4 +85,5 @@ Mudança conceitual: a posição da meta deixa de vir de aportes registrados e p
 ## Extras (pós-Fase 5)
 
 - [x] **Detalhe da meta** (`web/app/metas/page.tsx`): clicar numa meta abre um modal com as infos (alvo, prazo, responsável, posição, faltante, aporte mínimo, conclusão projetada) e um **gráfico de barras empilhadas mês a mês** — posição acumulada + aporte estimado do mês, com o topo de um mês virando a posição do seguinte, e linha do alvo. Usa `plan.monthly[].perGoal` da simulação.
+- [x] **Evolução das metas (linhas, 24m)** (`web/app/metas/page.tsx`): gráfico de linhas na tela de Metas com a posição projetada de cada meta mês a mês nos próximos 24 meses (uma linha por meta), a partir de `plan.monthly` + posição inicial.
 - [ ] Atualizar em Contas os saldos atuais de BB, Caixa e Santander (snapshots defasados em 2026-01) para o patrimônio de partida ficar exato.

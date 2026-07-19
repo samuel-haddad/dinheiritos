@@ -2,20 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
+  ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import AuthGate from '@/components/AuthGate';
 import HealthChip from '@/components/HealthChip';
 import Nav from '@/components/Nav';
 import { AppData, brl, currentNetWorth, loadAppData } from '@/lib/data';
 import { GoalHealth, GoalStatus, MonthAllocation, planGoals, requiredHorizon } from '@/lib/engine/allocation';
-import { formatMonth } from '@/lib/engine/months';
+import { formatMonth, monthRange } from '@/lib/engine/months';
 import { defaultStartMonth, project } from '@/lib/engine/projection';
 import { supabase } from '@/lib/supabase';
 import type { Goal } from '@/lib/types';
 
 const axis = { fontSize: 11, fill: 'currentColor' } as const;
 const kfmt = (v: number) => `${Math.round(v / 1000)}k`;
+const GOAL_COLORS = [
+  '#22c55e', '#58a6e8', '#f97316', '#e879f9', '#eab308',
+  '#14b8a6', '#f43f5e', '#8b5cf6', '#84cc16', '#06b6d4',
+];
 const tooltipStyle = {
   background: 'var(--tooltip-bg)',
   border: '1px solid var(--tooltip-border)',
@@ -340,7 +345,25 @@ function Goals() {
       refMonth
     );
     const ordered = [...plan.statuses].sort((a, b) => a.goal.priority - b.goal.priority);
-    return { plan, ordered };
+
+    // Evolução projetada: posição de cada meta, mês a mês, nos próximos 24 meses.
+    const allocByMonth = new Map(
+      plan.monthly.map((m) => [m.month, new Map(m.perGoal.map((p) => [p.goalId, p.amount]))])
+    );
+    const runPos = new Map(plan.statuses.map((s) => [s.goal.id, s.current]));
+    const evolution = monthRange(refMonth, 24).map((month) => {
+      const row: Record<string, number | string> = { label: formatMonth(month) };
+      const am = allocByMonth.get(month);
+      for (const s of ordered) {
+        const cur = runPos.get(s.goal.id) ?? 0;
+        row[s.goal.id] = Math.round(cur * 100) / 100;
+        const add = am?.get(s.goal.id) ?? 0;
+        runPos.set(s.goal.id, Math.min(Number(s.goal.target_amount), Math.round((cur + add) * 100) / 100));
+      }
+      return row;
+    });
+
+    return { plan, ordered, evolution };
   }, [data, engineInput]);
 
   // Viabilidade da meta em edição/criação (5.3): simula a lista com a meta prospectiva.
@@ -432,6 +455,40 @@ function Goals() {
         <div className="mb-4 space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
           {view.plan.alerts.map((a, i) => <p key={i}>⚠️ {a}</p>)}
         </div>
+      )}
+
+      {view.ordered.length > 0 && (
+        <section className="card mb-4">
+          <h2 className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Evolução estimada das metas — próximos 24 meses
+          </h2>
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            Posição projetada de cada meta, mês a mês, sob a alocação do saldo livre. Cada linha sobe
+            até o valor-alvo e estabiliza quando a meta é concluída.
+          </p>
+          <div className="text-slate-600 dark:text-slate-300">
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={view.evolution} margin={{ left: 12 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.3} />
+                <XAxis dataKey="label" tick={axis} interval={1} />
+                <YAxis tick={axis} tickFormatter={kfmt} />
+                <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
+                <Legend />
+                {view.ordered.map((s, i) => (
+                  <Line
+                    key={s.goal.id}
+                    type="monotone"
+                    dataKey={s.goal.id}
+                    name={s.goal.name}
+                    stroke={GOAL_COLORS[i % GOAL_COLORS.length]}
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
       )}
 
       <div className="space-y-4">
