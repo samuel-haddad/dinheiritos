@@ -13,7 +13,7 @@ A sugestão inicial centralizava tudo numa tabela de transações. Isso foi desc
 
 - **Estimativas** (o que esperamos que aconteça): `recurring_incomes`, `recurring_expenses`, `one_off_incomes`, `planned_expenses`.
 - **Observações** (o que medimos periodicamente): `account_snapshots`, `investment_snapshots`, `card_bills`.
-- **Objetivos**: `goals` e `goal_contributions`.
+- **Objetivos**: `goals` (posição derivada do patrimônio).
 - **Resultado calculado**: `monthly_projections` (cache materializado da projeção).
 
 Isso espelha exatamente como a planilha legada já funcionava (abas separadas por natureza) e simplifica o motor de projeção.
@@ -59,15 +59,15 @@ Detalhes completos em [docs/DATA_MODEL.md](docs/DATA_MODEL.md).
 | Identidade | `profiles` |
 | Estimativas | `recurring_incomes`, `recurring_expenses`, `one_off_incomes`, `planned_expenses` |
 | Observações | `accounts`, `account_snapshots`, `credit_cards`, `card_bills`, `investments`, `investment_snapshots` |
-| Metas | `goals`, `goal_contributions` |
+| Metas | `goals` |
 | Projeção | `monthly_projections` (cache) |
 
 ## 5. Épicos funcionais
 
 1. **Dashboard prospectivo** — saldo livre projetado por mês (24 meses), linha de patrimônio, comparação com a linha-alvo das metas.
 2. **Motor de projeção** — calcula receita, despesa, fatura e saldo livre por mês. Regras em [docs/PROJECTION_ENGINE.md](docs/PROJECTION_ENGINE.md).
-3. **Motor de alocação** — distribui o saldo livre entre metas por peso e urgência de prazo.
-4. **Gestão de metas** — CRUD de metas, registro de aportes, "meta alcançada".
+3. **Motor de alocação** — posição das metas vem do patrimônio (por prazo, teto no alvo, cascata); o saldo livre futuro preenche o faltante.
+4. **Gestão de metas** — CRUD de metas; posição, aporte mínimo e alcance são calculados (sem aportes manuais).
 5. **IA Financial Advisor** (fase futura) — Edge Function envia JSON (mês atual + 6 meses projetados) à Anthropic API; retorna alertas de viabilidade e recomendações.
 
 ## 6. Autenticação e segurança

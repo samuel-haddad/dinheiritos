@@ -151,23 +151,12 @@ Ex.: empréstimo, obra do jardim, 13º de funcionárias. *(planilha: `previsoes`
 | profile_id | uuid FK | |
 | name | text | ex.: "Viagem para China" |
 | target_amount | numeric | |
-| weight | numeric | **LEGADO** (migration 0002) — não usado |
-| priority | int | desempate quando o saldo não cobre todos os aportes mínimos (menor = mais prioritária) |
+| priority | int | desempate quando o saldo do mês não cobre todos os aportes mínimos (menor = mais prioritária) |
 | paused | boolean | fora da alocação |
 | start_month | date | |
 | deadline | date | |
-| achieved | boolean | |
 
-Campos calculados (valor atual, faltante, aporte mínimo, status) **não são colunas** — derivam de `goal_contributions` e do motor de alocação (`docs/PROJECTION_ENGINE.md` §2).
-
-### `goal_contributions` — aportes realizados
-
-| coluna | tipo | notas |
-|---|---|---|
-| goal_id | uuid FK | |
-| month | date | |
-| amount | numeric | |
-| note | text | |
+Campos calculados (posição atual, faltante, aporte mínimo, status/alcance) **não são colunas**: a posição vem do **patrimônio** (contas + investimentos) distribuído por prazo, com teto no alvo e excedente cascateando (`docs/PROJECTION_ENGINE.md` §2). As colunas `weight` (legada) e `achieved` foram removidas na migration 0005, e a tabela `goal_contributions` foi descontinuada — não há mais aportes manuais.
 
 ## Projeção (cache)
 

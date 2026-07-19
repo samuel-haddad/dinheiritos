@@ -5,7 +5,7 @@
 // A cada mês simulado: todas as metas ativas recebem seu AM (se o saldo
 // permitir); o excedente vai para a meta de prazo mais próximo; em déficit,
 // financia-se na ordem de prioridade (menor primeiro, empate por prazo).
-import type { Goal, GoalContribution, Month } from '../types';
+import type { Goal, Month } from '../types';
 import { addMonths, diffMonths } from './months';
 
 export type GoalHealth = 'achieved' | 'paused' | 'on_track' | 'late' | 'infeasible';
@@ -43,27 +43,47 @@ export interface FreeBalancePoint {
 }
 
 /**
- * Simula a alocação mês a mês. `freeBalances` deve cobrir pelo menos até o
- * último prazo das metas ativas (o chamador estende a projeção se preciso).
+ * Posição atual das metas (5.3): distribui o patrimônio (contas + investimentos)
+ * entre as metas ativas na ordem de prazo mais próximo (empate por prioridade),
+ * com teto no valor-alvo — o excedente cascateia para a próxima meta.
+ * Metas pausadas não recebem posição.
+ */
+export function distributeNetWorth(goals: Goal[], netWorth: number): Map<string, number> {
+  const positions = new Map<string, number>();
+  const ordered = goals
+    .filter((g) => !g.paused)
+    .sort((a, b) => a.deadline.localeCompare(b.deadline) || a.priority - b.priority);
+  let capacity = Math.max(0, Number(netWorth) || 0);
+  for (const g of ordered) {
+    const take = Math.min(Number(g.target_amount), capacity);
+    positions.set(g.id, r2(take));
+    capacity -= take;
+  }
+  return positions;
+}
+
+/**
+ * Simula a alocação mês a mês. A posição inicial de cada meta vem do patrimônio
+ * (`netWorth`) distribuído por `distributeNetWorth`; o saldo livre futuro preenche
+ * o faltante. `freeBalances` deve cobrir pelo menos até o último prazo ativo.
  */
 export function planGoals(
   goals: Goal[],
-  contributions: GoalContribution[],
+  netWorth: number,
   freeBalances: FreeBalancePoint[],
   refMonth: Month
 ): GoalPlan {
   const alerts: string[] = [];
 
+  const positions = distributeNetWorth(goals, netWorth);
   const base = goals.map((goal) => {
-    const current = contributions
-      .filter((c) => c.goal_id === goal.id)
-      .reduce((s, c) => s + Number(c.amount), 0);
+    const current = positions.get(goal.id) ?? 0;
     const remaining = Math.max(0, Number(goal.target_amount) - current);
     return { goal, current: r2(current), remaining: r2(remaining) };
   });
 
   const isActive = (b: { goal: Goal; remaining: number }) =>
-    !b.goal.achieved && !b.goal.paused && b.remaining > EPS;
+    !b.goal.paused && b.remaining > EPS;
 
   // Estado mutável da simulação
   const sim = new Map(base.map((b) => [b.goal.id, { ...b, done: null as Month | null }]));
@@ -136,7 +156,7 @@ export function planGoals(
     const monthsLeft = Math.max(0, diffMonths(refMonth, goal.deadline));
     const requiredMonthly = r2(remaining > 0 ? am(remaining, refMonth, goal.deadline) : 0);
     let health: GoalHealth;
-    if (goal.achieved || remaining <= EPS) health = 'achieved';
+    if (remaining <= EPS) health = 'achieved';
     else if (goal.paused) health = 'paused';
     else if (s.done && s.done <= goal.deadline) health = 'on_track';
     else if (s.done) health = 'late';
@@ -179,7 +199,7 @@ export function planGoals(
 
 /** Horizonte que a simulação precisa: até o último prazo ativo (cap 300 meses). */
 export function requiredHorizon(goals: Goal[], refMonth: Month): number {
-  const active = goals.filter((g) => !g.achieved && !g.paused);
+  const active = goals.filter((g) => !g.paused);
   if (active.length === 0) return 24;
   const maxDeadline = active.reduce((m, g) => (g.deadline > m ? g.deadline : m), refMonth);
   return Math.min(300, Math.max(24, diffMonths(refMonth, maxDeadline) + 13));

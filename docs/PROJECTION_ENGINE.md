@@ -41,16 +41,21 @@ free_balance(M) = income(M) − expenses(M)
 net_worth(M) = net_worth(M−1) + free_balance(M)
 ```
 
-## 2. Motor de alocação de metas (v2 — sem pesos)
+## 2. Motor de alocação de metas (v2 — sem pesos, sem aportes manuais)
 
-> Os pesos foram descontinuados (migration 0002). `goals.weight` é coluna legada.
-> A alocação é automática: o prazo de cada meta já codifica a necessidade de caixa.
+> Sem pesos (removidos na migration 0005) e sem aportes manuais. A **posição atual** de
+> cada meta é derivada do patrimônio; o prazo codifica a necessidade de caixa.
+
+**Posição atual (5.3):** `distributeNetWorth` reparte o patrimônio (contas + investimentos)
+entre as metas ativas na ordem de **prazo mais próximo** (empate por prioridade), com **teto
+no valor-alvo** — o excedente **cascateia** para a próxima meta. Metas pausadas não recebem
+posição. O **alcance** é calculado: posição ≥ alvo ⇒ `achieved`.
 
 **Aporte mínimo autoajustável (AM):**
 
 ```
 AM(meta, M) = faltante(meta, M) / max(1, meses até o deadline)
-faltante = target_amount − Σ goal_contributions
+faltante = target_amount − posição(meta)
 ```
 
 Recalculado a cada mês da simulação: sub-aportes num mês elevam o AM dos seguintes.
@@ -63,7 +68,7 @@ Recalculado a cada mês da simulação: sub-aportes num mês elevam o AM dos seg
 
 **Simulação e status:** a simulação roda até o último prazo ativo (cap 300 meses) sobre a série de saldos livres projetados, e produz por meta: conclusão projetada e status — `on_track` (conclui até o prazo), `late` (conclui depois), `infeasible` (não conclui no horizonte), `paused`, `achieved`. Se a simulação por prazo-mais-próximo não cumpre os prazos, nenhuma distribuição cumpre (otimalidade EDF) — o alerta de inviabilidade é exato, não heurístico.
 
-Aportes efetivados são gravados em `goal_contributions`; a simulação usa alocações sugeridas apenas para meses futuros.
+A simulação usa alocações sugeridas apenas para meses futuros; não há aportes manuais persistidos.
 
 ## 3. Fechamento de mês
 
@@ -72,8 +77,9 @@ Ao virar o mês (ação manual ou via agente):
 1. Registrar snapshots de contas e investimentos (`account_snapshots`, `investment_snapshots`).
 2. Registrar faturas fechadas em `card_bills`.
 3. Confirmar `one_off_incomes` e parcelas ocorridas.
-4. Registrar aportes reais em `goal_contributions`.
-5. Recalcular e gravar `monthly_projections` com `is_closed = true`.
+4. Recalcular e gravar `monthly_projections` com `is_closed = true`.
+
+(A posição das metas vem dos snapshots do passo 1 — não há aportes a registrar.)
 
 ## 4. Invariantes
 

@@ -64,7 +64,7 @@ function Analises() {
     const long = project({ ...input, horizon: requiredHorizon(data.goals, startMonth) });
     const plan = planGoals(
       data.goals,
-      data.goalContributions,
+      currentNetWorth(data),
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
       startMonth
     );

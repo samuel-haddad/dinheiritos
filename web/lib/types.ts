@@ -114,13 +114,11 @@ export interface Goal {
   profile_id: string;
   name: string;
   target_amount: number;
-  /** LEGADO — não usado desde a migration 0002. */
-  weight: number;
+  /** Desempate quando o saldo do mês não cobre todos os aportes mínimos (menor = mais prioritária). */
   priority: number;
   paused: boolean;
   start_month: Month;
   deadline: Month;
-  achieved: boolean;
 }
 
 export interface MonthlyProjection {
@@ -132,12 +130,4 @@ export interface MonthlyProjection {
   goal_allocation: number;
   net_worth: number;
   is_closed: boolean;
-}
-
-export interface GoalContribution {
-  id: string;
-  goal_id: string;
-  month: Month;
-  amount: number;
-  note: string | null;
 }

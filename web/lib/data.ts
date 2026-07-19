@@ -8,7 +8,6 @@ import type {
   CardBill,
   CreditCard,
   Goal,
-  GoalContribution,
   Investment,
   InvestmentSnapshot,
   MonthlyProjection,
@@ -32,7 +31,6 @@ export interface AppData {
   investments: Investment[];
   investmentSnapshots: InvestmentSnapshot[];
   goals: Goal[];
-  goalContributions: GoalContribution[];
   monthlyProjections: MonthlyProjection[];
 }
 
@@ -47,7 +45,7 @@ export async function loadAppData(): Promise<AppData> {
   const [
     profiles, recurringIncomes, recurringExpenses, oneOffIncomes, plannedExpenses,
     accounts, accountSnapshots, creditCards, cardBills,
-    investments, investmentSnapshots, goals, goalContributions, monthlyProjections,
+    investments, investmentSnapshots, goals, monthlyProjections,
   ] = await Promise.all([
     all<Profile>('profiles'),
     all<RecurringIncome>('recurring_incomes'),
@@ -61,13 +59,12 @@ export async function loadAppData(): Promise<AppData> {
     all<Investment>('investments'),
     all<InvestmentSnapshot>('investment_snapshots', 'month'),
     all<Goal>('goals'),
-    all<GoalContribution>('goal_contributions', 'month'),
     all<MonthlyProjection>('monthly_projections', 'month'),
   ]);
   return {
     profiles, recurringIncomes, recurringExpenses, oneOffIncomes, plannedExpenses,
     accounts, accountSnapshots, creditCards, cardBills,
-    investments, investmentSnapshots, goals, goalContributions, monthlyProjections,
+    investments, investmentSnapshots, goals, monthlyProjections,
   };
 }
 

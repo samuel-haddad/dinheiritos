@@ -9,8 +9,7 @@ O Dinheiritos é alimentado conversando com Claude (Cowork ou Claude Code) conec
 | Fechamento do mês | "Fecha junho: BTG 5.321,81; Caixa 9.200; fatura BTG 2.661,49..." | `account_snapshots`, `card_bills`, `investment_snapshots`, `monthly_projections` |
 | Nova previsão | "Vamos parcelar a obra do jardim: 10 mil em 3x a partir de outubro, no meu nome" | `planned_expenses` |
 | Mudança de renda | "O salário da Ivana subiu para 35 mil a partir de setembro" | `recurring_incomes` (encerra a vigente, cria nova) |
-| Aporte em meta | "Aportei 8 mil na reserva de emergência este mês" | `goal_contributions` |
-| Nova meta | "Meta nova: trocar o carro, 250 mil até maio/2028, peso 0,2" | `goals` |
+| Nova meta | "Meta nova: trocar o carro, 250 mil até maio/2028" | `goals` (posição e alcance são calculados do patrimônio) |
 
 ## 2. Regras para o agente
 
@@ -36,7 +35,7 @@ Fonte: `data/legacy/old_data.xlsx`. Mapeamento aba → tabela:
 | `cartoes` | `credit_cards` | "Valor base" → `base_amount`; "Dia do Vencimento" → `due_day` |
 | `gasto_cartao` | `card_bills` | "Fatura" → `amount`; `chave_ano_mes` → `month` |
 | `investimento` | `investments` + `investment_snapshots` | locais distintos viram `investments`; linhas viram snapshots |
-| `metas` | `goals` | só colunas de entrada (Meta, Valor, Peso, Inicio, Prazo, Responsável); colunas calculadas são descartadas |
+| `metas` | `goals` | só colunas de entrada (Meta, Valor, Início, Prazo, Responsável); posição/alcance são calculados |
 | `saldo` | `monthly_projections` | meses passados com `is_closed = true`; opcional (recalculável) |
 | `reservas`, `icons` | — | descartadas (`icons` já está em `logo_url`) |
 

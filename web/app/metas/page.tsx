@@ -5,8 +5,8 @@ import AuthGate from '@/components/AuthGate';
 import HealthChip from '@/components/HealthChip';
 import Nav from '@/components/Nav';
 import { AppData, brl, currentNetWorth, loadAppData } from '@/lib/data';
-import { GoalStatus, planGoals, requiredHorizon } from '@/lib/engine/allocation';
-import { diffMonths, formatMonth } from '@/lib/engine/months';
+import { GoalHealth, GoalStatus, planGoals, requiredHorizon } from '@/lib/engine/allocation';
+import { formatMonth } from '@/lib/engine/months';
 import { defaultStartMonth, project } from '@/lib/engine/projection';
 import { supabase } from '@/lib/supabase';
 import type { Goal } from '@/lib/types';
@@ -14,6 +14,14 @@ import type { Goal } from '@/lib/types';
 // ---------- helpers ----------
 const toMonthInput = (m: string) => m.slice(0, 7); // '2026-07-01' -> '2026-07'
 const fromMonthInput = (v: string) => `${v}-01`;
+
+const HEALTH_LABEL: Record<GoalHealth, string> = {
+  on_track: 'No prazo',
+  late: 'Vai atrasar',
+  infeasible: 'Inviável no horizonte',
+  paused: 'Pausada',
+  achieved: 'Já alcançada',
+};
 
 interface GoalForm {
   id?: string;
@@ -23,7 +31,6 @@ interface GoalForm {
   start_month: string;
   profile_id: string;
   paused: boolean;
-  achieved: boolean;
 }
 
 // ---------- modais ----------
@@ -42,23 +49,16 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function GoalDialog({
-  form, profiles, remainingNow, onChange, onSave, onClose, saving,
+  form, profiles, viability, onChange, onSave, onClose, saving,
 }: {
   form: GoalForm;
   profiles: { id: string; name: string }[];
-  remainingNow: number; // faltante atual (para simulador de AM)
+  viability: GoalStatus | null; // simulação da meta com os valores do formulário
   onChange: (f: GoalForm) => void;
   onSave: () => void;
   onClose: () => void;
   saving: boolean;
 }) {
-  // Simulador "e se": AM com os valores do formulário
-  const refMonth = defaultStartMonth();
-  const target = parseFloat(form.target_amount.replace(',', '.')) || 0;
-  const already = form.id ? Math.max(0, target - remainingNow) : 0;
-  const months = form.deadline ? Math.max(1, diffMonths(refMonth, fromMonthInput(form.deadline))) : 1;
-  const am = Math.max(0, target - already) / months;
-
   return (
     <Modal title={form.id ? 'Editar meta' : 'Nova meta'} onClose={onClose}>
       <div className="space-y-3">
@@ -83,21 +83,40 @@ function GoalDialog({
             {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={form.paused}
-              onChange={(e) => onChange({ ...form, paused: e.target.checked })} /> Pausada
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={form.achieved}
-              onChange={(e) => onChange({ ...form, achieved: e.target.checked })} /> Alcançada
-          </label>
-        </div>
-        <div className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-navy-900">
-          Com esses valores, o aporte mínimo é{' '}
-          <strong className="text-accent-600 dark:text-accent-400">{brl.format(am)}/mês</strong>{' '}
-          por {months} meses.
-        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={form.paused}
+            onChange={(e) => onChange({ ...form, paused: e.target.checked })} /> Pausada
+        </label>
+
+        {/* Viabilidade (5.3): simula a meta contra o patrimônio + saldo livre projetado */}
+        {viability ? (
+          <div className="space-y-1 rounded-lg bg-slate-50 p-3 text-sm dark:bg-navy-900">
+            <div className="flex items-center gap-2">
+              <HealthChip health={viability.health} />
+              <span className="font-medium">{HEALTH_LABEL[viability.health]}</span>
+            </div>
+            <div className="text-slate-500 dark:text-slate-400">
+              Posição estimada hoje (do patrimônio):{' '}
+              <strong className="text-slate-700 dark:text-slate-200">{brl.format(viability.current)}</strong>
+            </div>
+            {viability.remaining > 0 && (
+              <div className="text-slate-500 dark:text-slate-400">
+                Aporte mínimo:{' '}
+                <strong className="text-accent-600 dark:text-accent-400">{brl.format(viability.requiredMonthly)}/mês</strong>
+              </div>
+            )}
+            {viability.projectedCompletion && (
+              <div className="text-slate-500 dark:text-slate-400">
+                Conclusão projetada: {formatMonth(viability.projectedCompletion)}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-400 dark:bg-navy-900">
+            Preencha valor-alvo e prazo para ver a viabilidade.
+          </div>
+        )}
+
         <button onClick={onSave} disabled={saving || !form.name || !form.deadline} className="btn-primary w-full">
           {saving ? 'Salvando…' : 'Salvar'}
         </button>
@@ -106,63 +125,13 @@ function GoalDialog({
   );
 }
 
-function ContributionDialog({
-  goal, onDone, onClose,
-}: { goal: Goal; onDone: () => void; onClose: () => void }) {
-  const [amount, setAmount] = useState('');
-  const [month, setMonth] = useState(toMonthInput(defaultStartMonth()));
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function save() {
-    setSaving(true);
-    setError(null);
-    const { error } = await supabase().from('goal_contributions').insert({
-      goal_id: goal.id,
-      month: fromMonthInput(month),
-      amount: parseFloat(amount.replace(',', '.')),
-      note: note || null,
-    });
-    setSaving(false);
-    if (error) setError(error.message);
-    else { onDone(); onClose(); }
-  }
-
-  return (
-    <Modal title={`Aporte — ${goal.name}`} onClose={onClose}>
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs text-slate-500 dark:text-slate-400">
-            Valor (R$)
-            <input className="input mt-1" inputMode="decimal" value={amount}
-              onChange={(e) => setAmount(e.target.value)} autoFocus />
-          </label>
-          <label className="text-xs text-slate-500 dark:text-slate-400">
-            Mês
-            <input className="input mt-1" type="month" value={month}
-              onChange={(e) => setMonth(e.target.value)} />
-          </label>
-        </div>
-        <input className="input" placeholder="Observação (opcional)" value={note}
-          onChange={(e) => setNote(e.target.value)} />
-        {error && <p className="text-sm text-red-500">{error}</p>}
-        <button onClick={save} disabled={saving || !amount} className="btn-primary w-full">
-          {saving ? 'Salvando…' : 'Registrar aporte'}
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
 // ---------- card de meta ----------
 function GoalCard({
-  s, ownerName, onEdit, onContribute, onMove, onDelete, first, last,
+  s, ownerName, onEdit, onMove, onDelete, first, last,
 }: {
   s: GoalStatus;
   ownerName: string;
   onEdit: () => void;
-  onContribute: () => void;
   onMove: (dir: -1 | 1) => void;
   onDelete: () => void;
   first: boolean;
@@ -205,7 +174,6 @@ function GoalCard({
         )}
       </div>
       <div className="mt-3 flex items-center gap-1 border-t border-slate-100 pt-2 dark:border-navy-700">
-        <button className="btn-ghost" onClick={onContribute}>+ Aporte</button>
         <button className="btn-ghost" onClick={onEdit}>Editar</button>
         <button className="btn-ghost" onClick={onDelete}>Excluir</button>
         <div className="ml-auto flex items-center gap-0.5 text-xs text-slate-400">
@@ -223,7 +191,6 @@ function Goals() {
   const [data, setData] = useState<AppData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<GoalForm | null>(null);
-  const [contributing, setContributing] = useState<Goal | null>(null);
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(() => {
@@ -231,12 +198,10 @@ function Goals() {
   }, []);
   useEffect(reload, [reload]);
 
-  const view = useMemo(() => {
+  const engineInput = useMemo(() => {
     if (!data) return null;
-    const refMonth = defaultStartMonth();
-    const long = project({
-      startMonth: refMonth,
-      horizon: requiredHorizon(data.goals, refMonth),
+    return {
+      startMonth: defaultStartMonth(),
       initialNetWorth: currentNetWorth(data),
       recurringIncomes: data.recurringIncomes,
       oneOffIncomes: data.oneOffIncomes,
@@ -244,16 +209,49 @@ function Goals() {
       plannedExpenses: data.plannedExpenses,
       creditCards: data.creditCards,
       cardBills: data.cardBills,
-    });
+    };
+  }, [data]);
+
+  const view = useMemo(() => {
+    if (!data || !engineInput) return null;
+    const refMonth = defaultStartMonth();
+    const long = project({ ...engineInput, horizon: requiredHorizon(data.goals, refMonth) });
     const plan = planGoals(
       data.goals,
-      data.goalContributions,
+      currentNetWorth(data),
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
       refMonth
     );
     const ordered = [...plan.statuses].sort((a, b) => a.goal.priority - b.goal.priority);
     return { plan, ordered };
-  }, [data]);
+  }, [data, engineInput]);
+
+  // Viabilidade da meta em edição/criação (5.3): simula a lista com a meta prospectiva.
+  const viability = useMemo<GoalStatus | null>(() => {
+    if (!data || !engineInput || !editing) return null;
+    const target = parseFloat(editing.target_amount.replace(',', '.')) || 0;
+    if (!editing.deadline || target <= 0) return null;
+    const refMonth = defaultStartMonth();
+    const prospective: Goal = {
+      id: editing.id ?? '__new__',
+      profile_id: editing.profile_id,
+      name: editing.name || 'Nova meta',
+      target_amount: target,
+      priority: data.goals.find((g) => g.id === editing.id)?.priority ?? data.goals.length + 1,
+      paused: editing.paused,
+      start_month: fromMonthInput(editing.start_month || toMonthInput(refMonth)),
+      deadline: fromMonthInput(editing.deadline),
+    };
+    const simGoals = [...data.goals.filter((g) => g.id !== editing.id), prospective];
+    const long = project({ ...engineInput, horizon: requiredHorizon(simGoals, refMonth) });
+    const plan = planGoals(
+      simGoals,
+      currentNetWorth(data),
+      long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
+      refMonth
+    );
+    return plan.statuses.find((s) => s.goal.id === prospective.id) ?? null;
+  }, [data, engineInput, editing]);
 
   async function saveGoal() {
     if (!editing) return;
@@ -265,7 +263,6 @@ function Goals() {
       start_month: editing.start_month ? fromMonthInput(editing.start_month) : defaultStartMonth(),
       profile_id: editing.profile_id,
       paused: editing.paused,
-      achieved: editing.achieved,
     };
     const db = supabase();
     const { error } = editing.id
@@ -288,10 +285,8 @@ function Goals() {
   }
 
   async function remove(goal: Goal) {
-    if (!confirm(`Excluir a meta "${goal.name}" e seus aportes registrados?`)) return;
-    const db = supabase();
-    await db.from('goal_contributions').delete().eq('goal_id', goal.id);
-    const { error } = await db.from('goals').delete().eq('id', goal.id);
+    if (!confirm(`Excluir a meta "${goal.name}"?`)) return;
+    const { error } = await supabase().from('goals').delete().eq('id', goal.id);
     if (error) setError(error.message);
     reload();
   }
@@ -302,15 +297,16 @@ function Goals() {
   const nameOf = (pid: string) => data.profiles.find((p) => p.id === pid)?.name ?? '';
   const blank: GoalForm = {
     name: '', target_amount: '', deadline: '', start_month: toMonthInput(defaultStartMonth()),
-    profile_id: data.profiles[0]?.id ?? '', paused: false, achieved: false,
+    profile_id: data.profiles[0]?.id ?? '', paused: false,
   };
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Sem pesos: cada meta tem um aporte mínimo automático (faltante ÷ meses até o prazo).
-          A ordem abaixo só desempata quando o saldo do mês não cobre todos os mínimos.
+          A posição de cada meta vem do patrimônio (contas + investimentos), distribuído por prazo
+          mais próximo, com teto no alvo — o excedente cascateia para as demais. A ordem abaixo só
+          desempata quando o saldo livre do mês não cobre todos os aportes mínimos.
         </p>
         <button className="btn-primary shrink-0" onClick={() => setEditing(blank)}>+ Nova meta</button>
       </div>
@@ -330,7 +326,6 @@ function Goals() {
             first={i === 0}
             last={i === view.ordered.length - 1}
             onMove={(dir) => move(i, dir)}
-            onContribute={() => setContributing(s.goal)}
             onDelete={() => remove(s.goal)}
             onEdit={() =>
               setEditing({
@@ -341,7 +336,6 @@ function Goals() {
                 start_month: toMonthInput(s.goal.start_month),
                 profile_id: s.goal.profile_id,
                 paused: s.goal.paused,
-                achieved: s.goal.achieved,
               })
             }
           />
@@ -352,15 +346,12 @@ function Goals() {
         <GoalDialog
           form={editing}
           profiles={data.profiles}
-          remainingNow={view.ordered.find((s) => s.goal.id === editing.id)?.remaining ?? 0}
+          viability={viability}
           onChange={setEditing}
           onSave={saveGoal}
           onClose={() => setEditing(null)}
           saving={saving}
         />
-      )}
-      {contributing && (
-        <ContributionDialog goal={contributing} onDone={reload} onClose={() => setContributing(null)} />
       )}
     </>
   );

@@ -40,8 +40,8 @@ Backlog levantado por Samuel. Itens marcados **decisão** dependem de uma escolh
 ### 5.0 Saneamento das bases derivadas (fazer primeiro)
 Auditar e ajustar (recalcular, apagar ou atualizar) todas as bases que guardam **projeções e dados de cálculo futuro**. **Fontes de verdade — não tocar:** Lançamentos (`recurring_incomes`, `recurring_expenses`, `one_off_incomes`, `planned_expenses`), Contas (`accounts`, `account_snapshots`), Cartões (`credit_cards`, `card_bills`), Investimentos (`investments`, `investment_snapshots`) e, em Metas, apenas os campos **meta (`name`), valor alvo (`target_amount`), prazo (`deadline`) e responsável (`profile_id`)**. Todo o resto é derivado e pode ser reconstruído.
 - [ ] **`monthly_projections`** — hoje 10 linhas, todas `is_closed` (2025-09→2026-06); nenhum mês futuro cacheado. É "sempre reconstituível pelo motor" (`docs/PROJECTION_ENGINE.md` §4). Validar cada linha fechada contra o motor e definir a política: guardar só histórico fechado ou também cachear futuros (e, nesse caso, rotina de recálculo).
-- [ ] **`goal_contributions`** — hoje 3 linhas (jul/2026). No novo modelo de Metas (5.3), a posição passa a vir do saldo real (contas + investimentos), tornando os aportes registrados redundantes. **Decisão:** limpar a tabela, mantê-la como histórico ou depreciá-la via migration.
-- [ ] **Colunas derivadas/legadas de `goals`** — `weight` (legado, migration 0002, não usado) e `achieved` (passa a ser calculado, item 3.5) podem ser saneadas/depreciadas. **Nota:** `priority`, `paused` e `start_month` são entradas manuais (não cálculos) — preservar salvo decisão em contrário.
+- [x] **`goal_contributions`** — depreciada (drop) na migration `0005`; a posição das metas vem do patrimônio (5.3).
+- [x] **Colunas derivadas/legadas de `goals`** — `weight` e `achieved` removidas na migration `0005`. `priority`, `paused` e `start_month` preservadas (entradas manuais).
 - [ ] Confirmar **antes de qualquer DELETE** (regra do `docs/DATA_INGESTION.md`).
 
 ### 5.1 Lançamentos (`web/app/lancamentos/page.tsx`)
@@ -57,13 +57,12 @@ Auditar e ajustar (recalcular, apagar ou atualizar) todas as bases que guardam *
 - [x] **Toggle "Em aberto"** (default ligado) filtrando faturas do mês corrente em diante, via `rowFilter` do `EntityManager` + `Toggle` na página `cartoes`.
 
 ### 5.3 Metas (`web/app/metas/page.tsx`, `web/lib/engine/allocation.ts`)
-Mudança conceitual: a posição da meta deixa de vir de aportes registrados e passa a ser derivada do saldo real (contas + investimentos).
-- [ ] **Posição atual = saldo em contas + investimentos**, distribuído entre as metas. Hoje `current = Σ goal_contributions` (`allocation.ts`); passar a alocar o `currentNetWorth(data)` entre as metas.
-  - **Decisão (fundamental):** qual a regra de distribuição do patrimônio atual entre as metas? (ex.: cascata por prioridade/prazo, como já é feito com o saldo livre; ou proporcional ao alvo). Define todo o resto do bloco.
-- [ ] **Teto na posição:** posição nunca > alvo; excedente cascateia para as demais metas (mesma lógica de "excedente" já existente em `allocation.ts` §2). Ajustar as bases de dados se preciso.
-- [ ] **Remover botão "+ Aporte"** (`GoalCard`) e o `ContributionDialog`. Sem aportes manuais, `goal_contributions` fica órfã — decidir manter (histórico) ou depreciar via migration.
-- [ ] **Viabilidade da nova meta:** ao cadastrar, rodar `planGoals` com a meta prospectiva e mostrar o status (no prazo / vai atrasar / inviável) antes de salvar. O `GoalDialog` já traz simulador de AM — estender.
-- [ ] **Remover checkbox "Alcançada"** (`GoalDialog`) — alcance passa a ser calculado (posição ≥ alvo). Ajustar `isActive`/`health` em `allocation.ts` para derivar `achieved` da posição; avaliar depreciar a coluna `goals.achieved`.
+Mudança conceitual: a posição da meta deixa de vir de aportes registrados e passa a ser derivada do saldo real (contas + investimentos). **Decisão tomada:** distribuição **por prazo mais próximo** (empate por prioridade).
+- [x] **Posição atual = saldo em contas + investimentos**, via `distributeNetWorth` (`allocation.ts`): `planGoals` agora recebe `currentNetWorth(data)` no lugar dos aportes.
+- [x] **Teto na posição:** cada meta recebe até o alvo; o excedente cascateia para a próxima mais urgente. Metas pausadas não recebem posição.
+- [x] **Remover botão "+ Aporte"** e o `ContributionDialog` (removidos). `goal_contributions` depreciada via migration `0005`.
+- [x] **Viabilidade da nova meta:** `GoalDialog` roda `planGoals` com a meta prospectiva (memo `viability`) e mostra status + posição estimada + aporte mínimo + conclusão projetada antes de salvar.
+- [x] **Remover checkbox "Alcançada":** alcance calculado (posição ≥ alvo). `isActive`/`health` derivam da posição; colunas `goals.achieved` e `goals.weight` removidas na migration `0005`.
 
 ### 5.4 Análises (`web/app/analises/page.tsx`)
 - [x] **Composição das despesas:** duas colunas por mês — Receitas (barra única) e Despesas (`stackId` próprio, empilhando Recorrentes + Faturas + Parcelas). **Decisão tomada:** Despesas soma o total (recorrentes incluídas).
