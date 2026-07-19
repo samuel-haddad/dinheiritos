@@ -1,15 +1,28 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
 import AuthGate from '@/components/AuthGate';
 import HealthChip from '@/components/HealthChip';
 import Nav from '@/components/Nav';
 import { AppData, brl, currentNetWorth, loadAppData } from '@/lib/data';
-import { GoalHealth, GoalStatus, planGoals, requiredHorizon } from '@/lib/engine/allocation';
+import { GoalHealth, GoalStatus, MonthAllocation, planGoals, requiredHorizon } from '@/lib/engine/allocation';
 import { formatMonth } from '@/lib/engine/months';
 import { defaultStartMonth, project } from '@/lib/engine/projection';
 import { supabase } from '@/lib/supabase';
 import type { Goal } from '@/lib/types';
+
+const axis = { fontSize: 11, fill: 'currentColor' } as const;
+const kfmt = (v: number) => `${Math.round(v / 1000)}k`;
+const tooltipStyle = {
+  background: 'var(--tooltip-bg)',
+  border: '1px solid var(--tooltip-border)',
+  borderRadius: 8,
+  color: 'var(--tooltip-text)',
+  fontSize: 12,
+};
 
 // ---------- helpers ----------
 const toMonthInput = (m: string) => m.slice(0, 7); // '2026-07-01' -> '2026-07'
@@ -34,10 +47,10 @@ interface GoalForm {
 }
 
 // ---------- modais ----------
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+      <div className={`card w-full ${wide ? 'max-w-2xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-semibold">{title}</h3>
           <button onClick={onClose} className="btn-ghost">✕</button>
@@ -125,12 +138,109 @@ function GoalDialog({
   );
 }
 
+// ---------- detalhe da meta ----------
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 py-1.5 text-sm last:border-0 dark:border-navy-700">
+      <span className="text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-right font-medium text-slate-700 dark:text-slate-200">{children}</span>
+    </div>
+  );
+}
+
+function GoalDetail({
+  s, monthly, ownerName, onClose,
+}: {
+  s: GoalStatus;
+  monthly: MonthAllocation[];
+  ownerName: string;
+  onClose: () => void;
+}) {
+  const EPS = 0.005;
+  const target = Number(s.goal.target_amount);
+
+  // Série mês a mês: posição acumulada (base) + aporte estimado do mês (topo).
+  // posição(M+1) = posição(M) + aporte(M). Vai até o mês em que conclui.
+  const series: { label: string; Posição: number; 'Aporte do mês': number }[] = [];
+  let pos = s.current;
+  for (const m of monthly) {
+    const aporte = m.perGoal.find((p) => p.goalId === s.goal.id)?.amount ?? 0;
+    if (pos >= target - EPS) break; // já concluída
+    series.push({
+      label: formatMonth(m.month),
+      Posição: Math.round(pos * 100) / 100,
+      'Aporte do mês': Math.round(aporte * 100) / 100,
+    });
+    pos = Math.round((pos + aporte) * 100) / 100;
+    if (aporte <= EPS && series.length > 36) break; // trava de segurança
+  }
+  if (series.length === 0) {
+    series.push({ label: formatMonth(defaultStartMonth()), Posição: Math.min(s.current, target), 'Aporte do mês': 0 });
+  }
+
+  const pct = Math.min(100, (s.current / target) * 100);
+  const tickEvery = Math.max(0, Math.ceil(series.length / 12) - 1);
+
+  return (
+    <Modal title={s.goal.name} onClose={onClose} wide>
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <HealthChip health={s.health} />
+          <span className="text-sm font-medium">{HEALTH_LABEL[s.health]}</span>
+        </div>
+
+        <div className="rounded-lg bg-slate-50 px-3 py-1 dark:bg-navy-900">
+          <InfoRow label="Responsável">{ownerName}</InfoRow>
+          <InfoRow label="Valor-alvo">{brl.format(target)}</InfoRow>
+          <InfoRow label="Prazo">{formatMonth(s.goal.deadline)}</InfoRow>
+          <InfoRow label="Posição atual (do patrimônio)">
+            {brl.format(s.current)} <span className="text-xs text-slate-400">({pct.toFixed(0)}%)</span>
+          </InfoRow>
+          <InfoRow label="Faltante">{brl.format(s.remaining)}</InfoRow>
+          {s.remaining > EPS && <InfoRow label="Aporte mínimo">{brl.format(s.requiredMonthly)}/mês</InfoRow>}
+          <InfoRow label="Conclusão projetada">
+            {s.projectedCompletion ? formatMonth(s.projectedCompletion) : 'não conclui no horizonte'}
+          </InfoRow>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+            Cada barra soma a <strong>posição acumulada</strong> e o <strong>aporte estimado do mês</strong>
+            (do saldo livre projetado). O topo de um mês vira a posição do mês seguinte, até cruzar o alvo.
+          </p>
+          <div className="text-slate-600 dark:text-slate-300">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={series} margin={{ left: 12 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.3} />
+                <XAxis dataKey="label" tick={axis} interval={tickEvery} />
+                <YAxis tick={axis} tickFormatter={kfmt} />
+                <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
+                <Legend />
+                <ReferenceLine
+                  y={target}
+                  stroke="#f59e0b"
+                  strokeDasharray="4 4"
+                  ifOverflow="extendDomain"
+                  label={{ value: 'Alvo', position: 'insideTopRight', fontSize: 11, fill: '#f59e0b' }}
+                />
+                <Bar dataKey="Posição" stackId="s" fill="#58a6e8" />
+                <Bar dataKey="Aporte do mês" stackId="s" fill="#22c55e" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ---------- card de meta ----------
 function GoalCard({
-  s, ownerName, onEdit, onMove, onDelete, first, last,
+  s, ownerName, onOpen, onEdit, onMove, onDelete, first, last,
 }: {
   s: GoalStatus;
   ownerName: string;
+  onOpen: () => void;
   onEdit: () => void;
   onMove: (dir: -1 | 1) => void;
   onDelete: () => void;
@@ -142,6 +252,11 @@ function GoalCard({
   const active = s.health === 'on_track' || s.health === 'late' || s.health === 'infeasible';
   return (
     <div className="card">
+      <div
+        className="-m-1 cursor-pointer rounded-lg p-1 transition-colors hover:bg-slate-50 dark:hover:bg-navy-900/50"
+        onClick={onOpen}
+        title="Ver detalhes da meta"
+      >
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <h3 className="font-semibold">{s.goal.name}</h3>
         <HealthChip health={s.health} />
@@ -173,6 +288,7 @@ function GoalCard({
           </span>
         )}
       </div>
+      </div>
       <div className="mt-3 flex items-center gap-1 border-t border-slate-100 pt-2 dark:border-navy-700">
         <button className="btn-ghost" onClick={onEdit}>Editar</button>
         <button className="btn-ghost" onClick={onDelete}>Excluir</button>
@@ -191,6 +307,7 @@ function Goals() {
   const [data, setData] = useState<AppData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<GoalForm | null>(null);
+  const [detailingId, setDetailingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(() => {
@@ -325,6 +442,7 @@ function Goals() {
             ownerName={nameOf(s.goal.profile_id)}
             first={i === 0}
             last={i === view.ordered.length - 1}
+            onOpen={() => setDetailingId(s.goal.id)}
             onMove={(dir) => move(i, dir)}
             onDelete={() => remove(s.goal)}
             onEdit={() =>
@@ -353,6 +471,19 @@ function Goals() {
           saving={saving}
         />
       )}
+
+      {detailingId && (() => {
+        const sd = view.ordered.find((x) => x.goal.id === detailingId);
+        if (!sd) return null;
+        return (
+          <GoalDetail
+            s={sd}
+            monthly={view.plan.monthly}
+            ownerName={nameOf(sd.goal.profile_id)}
+            onClose={() => setDetailingId(null)}
+          />
+        );
+      })()}
     </>
   );
 }

@@ -81,3 +81,8 @@ Mudança conceitual: a posição da meta deixa de vir de aportes registrados e p
   - `entries` extraídas para `web/lib/glossary.ts` (fonte única de glossário e tooltips).
   - Glossário centraliza a âncora via `scrollIntoView({ block: 'center' })` + destaque temporário; `scroll-mt-[40vh]`.
   - Aplicado no dashboard (KPIs e cards) e em Análises (por aba). Pronto para espalhar às demais telas.
+
+## Extras (pós-Fase 5)
+
+- [x] **Detalhe da meta** (`web/app/metas/page.tsx`): clicar numa meta abre um modal com as infos (alvo, prazo, responsável, posição, faltante, aporte mínimo, conclusão projetada) e um **gráfico de barras empilhadas mês a mês** — posição acumulada + aporte estimado do mês, com o topo de um mês virando a posição do seguinte, e linha do alvo. Usa `plan.monthly[].perGoal` da simulação.
+- [ ] Atualizar em Contas os saldos atuais de BB, Caixa e Santander (snapshots defasados em 2026-01) para o patrimônio de partida ficar exato.
