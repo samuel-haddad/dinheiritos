@@ -1,61 +1,78 @@
-# Documento de Especificação e Arquitetura - Finanças Pessoais
+# Arquitetura — Dinheiritos
 
-## 1. Visão Geral e Proposta de Valor
-Aplicativo de gestão financeira focado em planejamento de longo prazo, alocação inteligente de saldos e projeção de cenários para o casal (Samuel e Ivana). O sistema atua como um navegador financeiro: consolida o histórico unificado de transações, projeta o fluxo de caixa futuro considerando faturas e previsões, e otimiza a alocação de saldos positivos para atingir metas com prazos definidos.
+## 1. Visão
 
-## 2. Stack Tecnológica
-* **Frontend:** Flutter (Web), otimizado para hospedagem no GitHub Pages.
-* **Backend & DB:** Supabase (PostgreSQL, Auth, Edge Functions).
-* **Design System:** Inspirado no Open Design. Foco em clareza, tipografia moderna e visual analítico (dashboard web), abandonando listas densas e modos escuros pesados.
-* **IA Engine:** Anthropic API (Claude 3.5 Sonnet / Opus 4.8) via Supabase Edge Functions.
+App de **planejamento e projeção financeira** do casal. O produto central é a **projeção**: a partir de estimativas (receitas/despesas recorrentes, previsões pontuais, faturas) e snapshots (contas, investimentos), o sistema projeta o fluxo de caixa de 24 meses e sugere a alocação do saldo livre entre metas com prazo.
 
-## 3. Modelo de Dados (PostgreSQL Relacional Otimizado)
+Não é um app de controle de gastos. Não existe lançamento de transações individuais.
 
-O modelo foge da estrutura de planilhas isoladas e centraliza o fluxo financeiro em uma única tabela de transações, facilitando a geração de gráficos evolutivos.
+## 2. Decisões de arquitetura
 
-* **`profiles`**: Identificação dos responsáveis (Samuel, Ivana).
-* **`accounts`**: Contas correntes e carteiras de investimento (ex: BTG, BB, Santander, Caixa).
-* **`categories`**: Mapeamento de categorias de gastos e receitas com ícones correspondentes.
-* **`transactions` (Fluxo de Caixa Unificado)**:
-    * `id` (uuid, PK)
-    * `profile_id` (fk -> profiles)
-    * `category_id` (fk -> categories)
-    * `description` (text): Ex: "Salário", "Condomínio", "Parcela Ora GT".
-    * `amount` (numeric): Valores positivos (receitas) ou negativos (despesas).
-    * `date` (date): Data de competência ou pagamento.
-    * `payment_method` (enum): 'account' ou 'credit_card'.
-    * `account_id` (fk -> accounts, nullable).
-    * `credit_card_id` (fk -> credit_cards, nullable).
-    * `credit_card_bill_id` (fk -> credit_card_bills, nullable).
-    * `is_recurring` (boolean): Flag para despesas/receitas fixas.
-    * `recurrence_period` (enum, nullable): 'monthly', 'yearly'.
-* **`credit_cards`**:
-    * `id` (uuid, PK)
-    * `profile_id` (fk -> profiles)
-    * `name` (text)
-    * `closing_day` (int), `due_day` (int).
-    * `projected_base_value` (numeric): Valor base assumido para meses futuros em que a fatura ainda não tem lançamentos.
-* **`credit_card_bills`**:
-    * `id` (uuid, PK)
-    * `credit_card_id` (fk -> credit_cards)
-    * `billing_month` (date).
-    * `status` (enum): 'open', 'closed', 'paid'.
-* **`installments`**: Controle de compras parceladas, gerando vínculos com transações futuras nas faturas.
-* **`investments`**:
-    * `id` (uuid, PK), `profile_id` (fk), `type` (Renda Fixa, Variável, Fundos), `current_balance`, `last_updated`.
-* **`goals` (Metas com Prazo)**:
-    * `id` (uuid, PK), `profile_id` (fk).
-    * `name` (text): Ex: "Viagem China".
-    * `target_amount` (numeric), `current_amount` (numeric).
-    * `deadline` (date).
-* **`forecasts` (Previsões Futuras)**:
-    * `id` (uuid, PK), `name` (text), `expected_amount` (numeric), `expected_date` (date).
-    * `is_installment_plan` (boolean), `number_of_installments` (int).
-    * `is_confirmed` (boolean): Flag que indica se a previsão já virou uma transação real.
-* **`monthly_balances`**: Tabela de snapshot para cache e renderização rápida de gráficos. Salva o saldo total de receitas, despesas, investimentos e o saldo livre de cada mês fechado.
+### D1 — Sem tabela `transactions`
+A sugestão inicial centralizava tudo numa tabela de transações. Isso foi descartado: o domínio do app são **estimativas e projeções**, não fatos contábeis. O modelo separa:
 
-## 4. Épicos Funcionais
+- **Estimativas** (o que esperamos que aconteça): `recurring_incomes`, `recurring_expenses`, `one_off_incomes`, `planned_expenses`.
+- **Observações** (o que medimos periodicamente): `account_snapshots`, `investment_snapshots`, `card_bills`.
+- **Objetivos**: `goals` e `goal_contributions`.
+- **Resultado calculado**: `monthly_projections` (cache materializado da projeção).
 
-1.  **Dashboard Prospetivo:** O painel principal cruza a linha de saldo acumulado projetado (próximos 24 meses) com a linha alvo de metas, renderizando barras de saldo livre (Receitas - Despesas Fixas - Faturas - Previsões).
-2.  **Motor de Alocação:** Algoritmo que calcula o saldo livre do mês corrente e sugere a distribuição ótima desse valor diretamente para as `goals`, baseando-se na urgência do `deadline`.
-3.  **IA Financial Advisor:** Função disparada via Supabase Edge Functions. Consolida um JSON do mês atual + 6 meses de projeção e envia ao LLM. A IA devolve alertas de viabilidade do fluxo de caixa e recomendações estratégicas sobre os saldos projetados.
+Isso espelha exatamente como a planilha legada já funcionava (abas separadas por natureza) e simplifica o motor de projeção.
+
+### D2 — Frontend Next.js com export estático
+Next.js (React) com `output: 'export'`, hospedado no GitHub Pages. Motivos: ecossistema maduro de gráficos para dashboards (Recharts), build estático simples, e melhor suporte de agentes de código do que Flutter Web. Todo acesso a dados é client-side via `@supabase/supabase-js` (anon key + RLS).
+
+### D3 — Projeção calculada no cliente, cacheada no banco
+O motor de projeção é uma função TypeScript pura (testável) que roda no cliente sobre os dados carregados. O resultado de meses fechados é persistido em `monthly_projections` para histórico e renderização rápida. Nenhuma lógica de negócio crítica em Edge Functions na fase inicial.
+
+### D4 — Ingestão de dados por agentes
+A alimentação do banco (saldos do mês, fatura fechada, nova previsão) é feita conversando com Claude (Cowork/Claude Code) conectado ao **Supabase MCP**. O arquivo `CLAUDE.md` e `docs/DATA_INGESTION.md` dão ao agente as regras do modelo. O app permanece somente leitura na prática cotidiana, com formulários de edição como fallback.
+
+### D5 — Supabase como única fonte de verdade
+Postgres com RLS por usuário autenticado (os dois perfis do casal compartilham os mesmos dados — RLS simples por `authenticated`). Schema versionado em `supabase/migrations/`.
+
+## 3. Componentes
+
+```
+┌────────────────────────────┐      ┌──────────────────────────┐
+│  web/ (Next.js estático)   │      │  Claude + Supabase MCP   │
+│  GitHub Pages              │      │  (ingestão de dados)     │
+│                            │      └───────────┬──────────────┘
+│  • Dashboard prospectivo   │                  │ SQL
+│  • Motor de projeção (TS)  │   supabase-js    │
+│  • Motor de alocação (TS)  ├──────────┐       │
+│  • Telas de metas/cadastro │          ▼       ▼
+└────────────────────────────┘      ┌──────────────────────────┐
+                                    │  Supabase                │
+┌────────────────────────────┐      │  • Postgres + RLS        │
+│  Edge Function (fase 4)    │◄─────┤  • Auth (casal)          │
+│  IA Financial Advisor      │      │  • Edge Functions        │
+│  (Anthropic API)           │      └──────────────────────────┘
+└────────────────────────────┘
+```
+
+## 4. Modelo de dados (resumo)
+
+Detalhes completos em [docs/DATA_MODEL.md](docs/DATA_MODEL.md).
+
+| Grupo | Tabelas |
+|---|---|
+| Identidade | `profiles` |
+| Estimativas | `recurring_incomes`, `recurring_expenses`, `one_off_incomes`, `planned_expenses` |
+| Observações | `accounts`, `account_snapshots`, `credit_cards`, `card_bills`, `investments`, `investment_snapshots` |
+| Metas | `goals`, `goal_contributions` |
+| Projeção | `monthly_projections` (cache) |
+
+## 5. Épicos funcionais
+
+1. **Dashboard prospectivo** — saldo livre projetado por mês (24 meses), linha de patrimônio, comparação com a linha-alvo das metas.
+2. **Motor de projeção** — calcula receita, despesa, fatura e saldo livre por mês. Regras em [docs/PROJECTION_ENGINE.md](docs/PROJECTION_ENGINE.md).
+3. **Motor de alocação** — distribui o saldo livre entre metas por peso e urgência de prazo.
+4. **Gestão de metas** — CRUD de metas, registro de aportes, "meta alcançada".
+5. **IA Financial Advisor** (fase futura) — Edge Function envia JSON (mês atual + 6 meses projetados) à Anthropic API; retorna alertas de viabilidade e recomendações.
+
+## 6. Autenticação e segurança
+
+- Supabase Auth com dois usuários (Samuel, Ivana), dados compartilhados.
+- RLS: todas as tabelas exigem `authenticated`; sem multi-tenancy nesta fase.
+- Anon key exposta no build estático é aceitável (RLS protege os dados).
+- Chave da Anthropic API só em secrets de Edge Function, nunca no cliente.
