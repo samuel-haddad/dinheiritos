@@ -84,6 +84,6 @@ Ao virar o mês (ação manual ou via agente):
 ## 4. Invariantes
 
 - O motor nunca grava no banco; quem persiste é a camada de fechamento.
-- `monthly_projections` é sempre reconstituível a partir das demais tabelas.
+- `monthly_projections` guarda só meses fechados (histórico); os futuros nunca são cacheados — o motor os reconstitui no cliente. (Meses legados anteriores a 2026-07 não são recomputáveis pelos insumos atuais.)
 - Valores monetários em `numeric`; nada de float no banco.
 - Horizonte padrão: mês atual + 24 meses.

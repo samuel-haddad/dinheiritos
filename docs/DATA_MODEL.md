@@ -161,7 +161,7 @@ Campos calculados (posição atual, faltante, aporte mínimo, status/alcance) **
 ## Projeção (cache)
 
 ### `monthly_projections`
-*(planilha: `saldo`)* Persistido para meses fechados (histórico) e opcionalmente como cache dos futuros. Sempre recalculável pelo motor.
+*(planilha: `saldo`)* Guarda **apenas meses fechados** (histórico). Meses futuros **nunca** são cacheados — o motor recalcula no cliente a cada carga. Meses legados anteriores a 2026-07 não são reconstituíveis pelos insumos atuais (as recorrentes começam em 2026-07); são registro histórico. O `goal_allocation` dos meses fechados foi zerado no saneamento (5.0) — não há aportes reconstruíveis.
 
 | coluna | tipo | notas |
 |---|---|---|
