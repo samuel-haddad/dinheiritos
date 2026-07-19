@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Bar, BarChart, CartesianGrid, Cell, Line, LineChart,
+  Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart,
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import Link from 'next/link';
@@ -60,7 +60,11 @@ function Dashboard() {
   if (!view) return <p className="text-slate-400">Carregando projeção…</p>;
 
   const cur = view.projections[0];
-  const chart = view.projections.map((p) => ({ ...p, label: formatMonth(p.month) }));
+  let accFree = 0;
+  const chart = view.projections.map((p) => {
+    accFree += p.freeBalance;
+    return { ...p, label: formatMonth(p.month), saldoAcumulado: Math.round(accFree * 100) / 100 };
+  });
   const active = view.plan.statuses.filter((s) => s.health !== 'achieved' && s.health !== 'paused');
 
   return (
@@ -84,18 +88,21 @@ function Dashboard() {
       <Card title="Saldo livre projetado — próximos 24 meses" g="saldo-livre">
         <div className="text-slate-600 dark:text-slate-300">
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chart} margin={{ left: 12 }}>
+            <ComposedChart data={chart} margin={{ left: 12, right: 12 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.3} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'currentColor' }} interval={1} />
-              <YAxis tick={{ fontSize: 11, fill: 'currentColor' }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+              <YAxis yAxisId="mes" tick={{ fontSize: 11, fill: 'currentColor' }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+              <YAxis yAxisId="acc" orientation="right" tick={{ fontSize: 11, fill: 'currentColor' }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
               <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
-              <ReferenceLine y={0} stroke="#94a3b8" />
-              <Bar dataKey="freeBalance" name="Saldo livre" radius={[4, 4, 0, 0]}>
+              <Legend />
+              <ReferenceLine yAxisId="mes" y={0} stroke="#94a3b8" />
+              <Bar yAxisId="mes" dataKey="freeBalance" name="Saldo livre (mês)" radius={[4, 4, 0, 0]}>
                 {chart.map((p) => (
                   <Cell key={p.month} fill={p.freeBalance >= 0 ? '#f97316' : '#ef4444'} />
                 ))}
               </Bar>
-            </BarChart>
+              <Line yAxisId="acc" type="monotone" dataKey="saldoAcumulado" name="Saldo livre acumulado" stroke="#58a6e8" strokeWidth={2} dot={false} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </Card>

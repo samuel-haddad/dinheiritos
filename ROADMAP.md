@@ -71,8 +71,7 @@ Mudança conceitual: a posição da meta deixa de vir de aportes registrados e p
 - [x] **Acumulados:** séries aportes acumulados, previsões acumuladas e despesas acumuladas (substituem saldo/aportes acumulados). Glossário de "Acumulados" atualizado.
 
 ### 5.5 Projeção / Dashboard (`web/app/page.tsx`)
-- [ ] **Saldo livre projetado (24m):** exibir o saldo livre acumulado até o fim do período mostrado (ex.: linha de acumulado sobre as barras, ou total no fim).
-  - **Decisão:** confirmar formato (linha de acumulado vs. total no rótulo).
+- [x] **Saldo livre projetado (24m):** `ComposedChart` com as barras mensais (eixo esquerdo) + linha de **saldo livre acumulado** (eixo direito) chegando ao total no fim do período. Glossário de "Saldo livre" atualizado.
 - [x] **Patrimônio "estabilizando" — investigado: não é bug de gráfico nem de fórmula.** O gráfico e a fórmula `netWorth(M) = netWorth(M−1) + saldo_livre(M)` estão corretos. A curva achata (na verdade cai ~R$160/mês) a partir de mar/2027 porque o **saldo livre projetado cai a ≈ 0** ali. Duas causas, ambas nos dados/modelo — não no código:
   - Rendas anuais (13º Ivana R$25.800, 13º Samuel R$22.499, férias, restituição ≈ R$91k no total) estão como **pontuais só em 2026** e não se repetem → a renda de 2027+ é só a recorrente mensal (R$56.919). **A periodicidade anual do item 5.1 corrige isto.**
   - De mar/2027 a projeção volta todo cartão ao `base_amount` (R$17.500/mês somados) porque as faturas reais vão só até fev/2027; somado à despesa recorrente "Gastos cartão" (R$8.000), o gasto de cartão parece **duplicado/superestimado**. **Revisar `base_amount` dos cartões vs. "Gastos cartão".**

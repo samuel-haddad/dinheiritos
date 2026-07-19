@@ -29,7 +29,7 @@ export const GLOSSARY: GlossaryEntry[] = [
     id: 'saldo-livre',
     term: 'Saldo livre',
     formula: 'receitas do mês − despesas do mês',
-    desc: 'O que sobra (ou falta) no mês antes dos aportes em metas. É a matéria-prima da alocação: aportes só são sugeridos quando o saldo livre é positivo.',
+    desc: 'O que sobra (ou falta) no mês antes dos aportes em metas. É a matéria-prima da alocação: aportes só são sugeridos quando o saldo livre é positivo. No gráfico de 24 meses, a linha mostra o saldo livre acumulado — o total projetado somado até o fim do período.',
   },
   {
     id: 'patrimonio',
