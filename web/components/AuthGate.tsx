@@ -51,36 +51,39 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-slate-400">Carregando…</div>
+      <div className="flex min-h-screen items-center justify-center" style={{ background: 'var(--bg)', color: 'var(--muted)' }}>
+        Carregando…
+      </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="card w-full max-w-sm space-y-4 !p-8">
+      <div className="flex min-h-screen items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
+        <div className="card w-full max-w-sm space-y-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset('/logo.png')} alt="Dinheiritos" className="mx-auto w-40" />
-          <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-center text-sm" style={{ color: 'var(--muted)' }}>
             Planejamento e projeção financeira do casal.
           </p>
           <button
             onClick={signInGoogle}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-navy-600 dark:bg-navy-900 dark:text-slate-200 dark:hover:bg-navy-700"
+            className="flex w-full items-center justify-center gap-2 rounded-full border py-2.5 text-sm font-semibold transition-colors"
+            style={{ borderColor: 'var(--line)', background: 'var(--surface)', color: 'var(--ink)' }}
           >
             <GoogleIcon /> Entrar com Google
           </button>
-          <div className="flex items-center gap-3 text-xs text-slate-400">
-            <div className="h-px flex-1 bg-slate-200 dark:bg-navy-700" /> ou{' '}
-            <div className="h-px flex-1 bg-slate-200 dark:bg-navy-700" />
+          <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--muted)' }}>
+            <div className="h-px flex-1" style={{ background: 'var(--line)' }} /> ou{' '}
+            <div className="h-px flex-1" style={{ background: 'var(--line)' }} />
           </div>
           <form onSubmit={signIn} className="space-y-3">
             <input type="email" required placeholder="E-mail" value={email}
               onChange={(e) => setEmail(e.target.value)} className="input" />
             <input type="password" required placeholder="Senha" value={password}
               onChange={(e) => setPassword(e.target.value)} className="input" />
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <button type="submit" className="btn-primary w-full">Entrar</button>
+            {error && <p className="text-sm" style={{ color: 'var(--neg)' }}>{error}</p>}
+            <button type="submit" className="btn-primary w-full justify-center">Entrar</button>
           </form>
         </div>
       </div>

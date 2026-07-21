@@ -12,15 +12,29 @@ export default function Toggle({
   onLabel: string;
   offLabel: string;
 }) {
-  const base = 'rounded-md px-3 py-1 text-sm font-medium transition-colors';
-  const active = 'bg-accent-600/10 text-accent-600 dark:bg-accent-500/15 dark:text-accent-400';
-  const idle = 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200';
+  const base = 'rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors';
   return (
-    <div className="inline-flex items-center rounded-lg border border-slate-200 p-0.5 dark:border-navy-700">
-      <button type="button" onClick={() => onChange(true)} className={`${base} ${on ? active : idle}`}>
+    <div className="inline-flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: 'var(--surface-2)' }}>
+      <button
+        type="button"
+        onClick={() => onChange(true)}
+        className={base}
+        style={{
+          background: on ? 'var(--surface)' : 'transparent',
+          color: on ? 'var(--accent-strong)' : 'var(--muted)',
+        }}
+      >
         {onLabel}
       </button>
-      <button type="button" onClick={() => onChange(false)} className={`${base} ${!on ? active : idle}`}>
+      <button
+        type="button"
+        onClick={() => onChange(false)}
+        className={base}
+        style={{
+          background: !on ? 'var(--surface)' : 'transparent',
+          color: !on ? 'var(--accent-strong)' : 'var(--muted)',
+        }}
+      >
         {offLabel}
       </button>
     </div>

@@ -7,11 +7,11 @@ import {
 } from 'recharts';
 import AuthGate from '@/components/AuthGate';
 import InfoTip from '@/components/InfoTip';
-import Nav from '@/components/Nav';
+import Shell from '@/components/Shell';
 import Tabs from '@/components/Tabs';
 import { AppData, currentNetWorth, loadAppData } from '@/lib/data';
 import { brl } from '@/lib/format';
-import { planGoals, requiredHorizon } from '@/lib/engine/allocation';
+import { planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
 import { formatMonth } from '@/lib/engine/months';
 import { DEFAULT_HORIZON, defaultStartMonth, project } from '@/lib/engine/projection';
 
@@ -26,15 +26,15 @@ const TAB_GLOSSARY: Record<string, string | string[]> = {
 const tooltipStyle = {
   background: 'var(--tooltip-bg)',
   border: '1px solid var(--tooltip-border)',
-  borderRadius: 8,
+  borderRadius: 10,
   color: 'var(--tooltip-text)',
-  fontSize: 12,
+  fontSize: 12.5,
 };
-const axis = { fontSize: 11, fill: 'currentColor' } as const;
+const axis = { fontSize: 11, fill: 'var(--muted)' } as const;
 const kfmt = (v: number) => `${Math.round(v / 1000)}k`;
 const GOAL_COLORS = [
-  '#22c55e', '#58a6e8', '#f97316', '#e879f9', '#eab308',
-  '#14b8a6', '#f43f5e', '#8b5cf6', '#84cc16', '#06b6d4',
+  'var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)',
+  '#8A9A5B', '#B08968', '#6B8F71', '#A66E4E', '#4C7A73', '#C97B63',
 ];
 
 function Analises() {
@@ -70,6 +70,14 @@ function Analises() {
     );
     const allocByMonth = new Map(
       plan.monthly.map((m) => [m.month, m.perGoal.reduce((s, g) => s + g.amount, 0)])
+    );
+    // Patrimônio Projetado ajustado (docs/PROJECTION_ENGINE.md §1) — mesmo desconto do Dashboard.
+    const wealthByMonth = new Map(
+      projectedWealth(
+        proj.map((p) => ({ month: p.month, netWorth: p.netWorth })),
+        data.goals,
+        plan
+      ).map((w) => [w.month, w.netWorth])
     );
 
     // Aportes por meta, mês a mês (para o gráfico empilhado)
@@ -138,36 +146,35 @@ function Analises() {
       despesas: p.totalExpenses,
       saldo: p.freeBalance,
       aportes: allocByMonth.get(p.month) ?? 0,
-      patrimonio: p.netWorth,
+      patrimonio: wealthByMonth.get(p.month) ?? p.netWorth,
       real: false,
     }));
     return { chart, table: [...closed, ...projected], goalNames };
   }, [data]);
 
-  if (error) return <p className="text-red-500">Erro: {error}</p>;
-  if (!view) return <p className="text-slate-400">Carregando análises…</p>;
+  if (error) return <p style={{ color: 'var(--neg)' }}>Erro: {error}</p>;
+  if (!view) return <p style={{ color: 'var(--muted)' }}>Carregando análises…</p>;
 
   return (
     <>
-      <h1 className="mb-4 text-xl font-bold">Análises</h1>
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-      <div className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-600 dark:text-slate-300">
+      <div className="mb-3 flex items-center gap-1 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
         {tab}
         <InfoTip g={TAB_GLOSSARY[tab]} />
       </div>
 
-      <div className="card text-slate-600 dark:text-slate-300">
+      <div className="card">
         {tab === 'Receita × Despesa' && (
           <ResponsiveContainer width="100%" height={340}>
             <BarChart data={view.chart} margin={{ left: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.3} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
               <XAxis dataKey="label" tick={axis} interval={1} />
               <YAxis tick={axis} tickFormatter={kfmt} />
               <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
               <Legend />
-              <Bar dataKey="Receitas" fill="#58a6e8" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="Despesas" fill="#f97316" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="Receitas" fill="var(--chart-1)" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="Despesas" fill="var(--stack-1)" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -175,32 +182,31 @@ function Analises() {
         {tab === 'Composição das despesas' && (
           <ResponsiveContainer width="100%" height={340}>
             <BarChart data={view.chart} margin={{ left: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.3} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
               <XAxis dataKey="label" tick={axis} interval={1} />
               <YAxis tick={axis} tickFormatter={kfmt} />
               <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
               <Legend />
-              <Bar dataKey="Receitas" stackId="r" fill="#22c55e" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="Recorrentes" stackId="d" fill="#64748b" />
-              <Bar dataKey="Faturas" stackId="d" fill="#f97316" />
-              <Bar dataKey="Parcelas" stackId="d" fill="#e879f9" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="Recorrentes" stackId="d" fill="var(--stack-1)" />
+              <Bar dataKey="Faturas" stackId="d" fill="var(--stack-2)" />
+              <Bar dataKey="Parcelas" stackId="d" fill="var(--stack-3)" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}
 
         {tab === 'Aportes' &&
           (view.goalNames.length === 0 ? (
-            <p className="py-12 text-center text-sm text-slate-400">
+            <p className="py-12 text-center text-sm" style={{ color: 'var(--muted)' }}>
               Nenhum aporte sugerido no período — todas as metas estão pausadas, alcançadas ou sem saldo livre.
             </p>
           ) : (
             <>
-              <p className="mb-2 text-xs text-slate-400">
+              <p className="mb-2 text-xs" style={{ color: 'var(--muted)' }}>
                 Clique numa meta (barra ou legenda) para destacá-la; clique de novo para limpar.
               </p>
               <ResponsiveContainer width="100%" height={340}>
                 <BarChart data={view.chart} margin={{ left: 12 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.3} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
                   <XAxis dataKey="label" tick={axis} interval={1} />
                   <YAxis tick={axis} tickFormatter={kfmt} />
                   <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
@@ -216,7 +222,7 @@ function Analises() {
                       dataKey={nm}
                       stackId="ap"
                       fill={GOAL_COLORS[i % GOAL_COLORS.length]}
-                      fillOpacity={focus && focus !== nm ? 0.2 : 1}
+                      fillOpacity={focus && focus !== nm ? 0.25 : 1}
                       onClick={() => setFocus((f) => (f === nm ? null : nm))}
                       radius={i === view.goalNames.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
                     />
@@ -229,24 +235,24 @@ function Analises() {
         {tab === 'Acumulados' && (
           <ResponsiveContainer width="100%" height={340}>
             <AreaChart data={view.chart} margin={{ left: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.3} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
               <XAxis dataKey="label" tick={axis} interval={1} />
               <YAxis tick={axis} tickFormatter={kfmt} />
               <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
               <Legend />
-              <ReferenceLine y={0} stroke="#94a3b8" />
-              <Area dataKey="Despesas acumuladas" stroke="#f97316" fill="#f97316" fillOpacity={0.12} />
-              <Area dataKey="Previsões acumuladas" stroke="#e879f9" fill="#e879f9" fillOpacity={0.15} />
-              <Area dataKey="Aportes acumulados" stroke="#22c55e" fill="#22c55e" fillOpacity={0.15} />
+              <ReferenceLine y={0} stroke="var(--line)" />
+              <Area dataKey="Despesas acumuladas" stroke="var(--chart-4)" fill="var(--chart-4)" fillOpacity={0.12} />
+              <Area dataKey="Previsões acumuladas" stroke="var(--chart-3)" fill="var(--chart-3)" fillOpacity={0.15} />
+              <Area dataKey="Aportes acumulados" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.15} />
             </AreaChart>
           </ResponsiveContainer>
         )}
 
         {tab === 'Tabela saldo' && (
-          <div className="-m-5 overflow-x-auto">
+          <div className="-m-6 overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400 dark:border-navy-700">
+                <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--line)', color: 'var(--muted)' }}>
                   <th className="px-4 py-3">Mês</th>
                   <th className="px-4 py-3 text-right">Receitas</th>
                   <th className="px-4 py-3 text-right">Despesas</th>
@@ -256,24 +262,26 @@ function Analises() {
                   <th className="px-4 py-3">Origem</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-navy-700">
+              <tbody>
                 {view.table.map((r) => (
-                  <tr key={r.month} className={r.real ? '' : 'opacity-90'}>
-                    <td className="px-4 py-2">{formatMonth(r.month)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{brl.format(r.receitas)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{brl.format(r.despesas)}</td>
-                    <td className={`px-4 py-2 text-right tabular-nums ${r.saldo < 0 ? 'text-red-500' : ''}`}>
+                  <tr key={r.month} className="border-b last:border-0" style={{ borderColor: 'var(--line)' }}>
+                    <td className="px-4 py-2.5">{formatMonth(r.month)}</td>
+                    <td className="num px-4 py-2.5 text-right">{brl.format(r.receitas)}</td>
+                    <td className="num px-4 py-2.5 text-right">{brl.format(r.despesas)}</td>
+                    <td className="num px-4 py-2.5 text-right" style={{ color: r.saldo < 0 ? 'var(--neg)' : 'var(--ink)' }}>
                       {brl.format(r.saldo)}
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums">{brl.format(r.aportes)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{brl.format(r.patrimonio)}</td>
-                    <td className="px-4 py-2">
+                    <td className="num px-4 py-2.5 text-right">{brl.format(r.aportes)}</td>
+                    <td className="num px-4 py-2.5 text-right">{brl.format(r.patrimonio)}</td>
+                    <td className="px-4 py-2.5">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          r.real
-                            ? 'bg-sky2-500/15 text-sky2-600 dark:text-sky2-400'
-                            : 'bg-slate-500/15 text-slate-500 dark:text-slate-400'
-                        }`}
+                        className="badge"
+                        style={{
+                          color: r.real ? 'var(--accent-strong)' : 'var(--muted)',
+                          background: r.real
+                            ? 'color-mix(in srgb, var(--accent-strong) 15%, transparent)'
+                            : 'var(--surface-2)',
+                        }}
                       >
                         {r.real ? 'real' : 'projetado'}
                       </span>
@@ -292,10 +300,9 @@ function Analises() {
 export default function Page() {
   return (
     <AuthGate>
-      <main className="mx-auto max-w-6xl p-4 md:p-8">
-        <Nav />
+      <Shell>
         <Analises />
-      </main>
+      </Shell>
     </AuthGate>
   );
 }

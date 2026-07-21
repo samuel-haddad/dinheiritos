@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { distributeNetWorth, planGoals, requiredHorizon, FreeBalancePoint } from './allocation';
+import { distributeNetWorth, planGoals, projectedWealth, requiredHorizon, FreeBalancePoint } from './allocation';
 import { monthRange } from './months';
 import type { Goal } from '../types';
 
 const goal = (o: Partial<Goal>): Goal => ({
   id: 'g1', profile_id: 'p', name: 'Meta', target_amount: 10000,
-  priority: 1, paused: false, start_month: '2026-01-01', deadline: '2027-01-01', ...o,
+  priority: 1, paused: false, start_month: '2026-01-01', deadline: '2027-01-01',
+  category: 'patrimonio', ...o,
 });
 const fb = (months: number, value: number, start = '2026-07-01'): FreeBalancePoint[] =>
   monthRange(start, months).map((month) => ({ month, freeBalance: value }));
@@ -115,6 +116,46 @@ describe('planGoals — saúde da meta', () => {
     const { monthly } = planGoals([g], 0, fb(3, -2000), '2026-07-01');
     expect(monthly[0].perGoal.length === 0 || monthly[0].perGoal[0].amount === 0).toBe(true);
     expect(monthly[0].deficit).toBeGreaterThan(0);
+  });
+});
+
+describe('projectedWealth — patrimônio ajustado por metas de gasto', () => {
+  const raw = [
+    { month: '2026-07-01', netWorth: 5000 },
+    { month: '2026-08-01', netWorth: 8000 },
+  ];
+
+  it('sem metas de gasto, patrimônio fica igual ao bruto', () => {
+    const g = goal({ category: 'patrimonio' });
+    const { statuses, monthly } = planGoals([g], 0, fb(24, 2000), '2026-07-01');
+    const out = projectedWealth(raw, [g], { statuses, monthly, alerts: [] });
+    expect(out.map((p) => p.netWorth)).toEqual([5000, 8000]);
+    expect(out.every((p) => p.reserved === 0)).toBe(true);
+  });
+
+  it('meta de gasto reserva o alvo assim que a simulação aloca (capacidade abundante) e desconta do patrimônio', () => {
+    const g = goal({ category: 'gasto', target_amount: 1000, deadline: '2028-07-01' });
+    const { statuses, monthly } = planGoals([g], 0, fb(24, 5000), '2026-07-01');
+    const out = projectedWealth(raw, [g], { statuses, monthly, alerts: [] });
+    expect(out[0]).toEqual({ month: '2026-07-01', netWorth: 4000, reserved: 1000 });
+    // já reservado por completo — mês seguinte não desconta de novo, só mantém
+    expect(out[1]).toEqual({ month: '2026-08-01', netWorth: 7000, reserved: 1000 });
+  });
+
+  it('meta de gasto pausada não entra no desconto', () => {
+    const g = goal({ category: 'gasto', target_amount: 1000, paused: true });
+    const { statuses, monthly } = planGoals([g], 0, fb(24, 5000), '2026-07-01');
+    const out = projectedWealth(raw, [g], { statuses, monthly, alerts: [] });
+    expect(out.map((p) => p.netWorth)).toEqual([5000, 8000]);
+    expect(out.every((p) => p.reserved === 0)).toBe(true);
+  });
+
+  it('posição inicial (via patrimônio) já conta como reservado desde o primeiro mês', () => {
+    const g = goal({ category: 'gasto', target_amount: 4000, deadline: '2028-07-01' });
+    // patrimônio de 4000 já cobre a meta inteira antes de qualquer aporte futuro
+    const { statuses, monthly } = planGoals([g], 4000, fb(24, 5000), '2026-07-01');
+    const out = projectedWealth(raw, [g], { statuses, monthly, alerts: [] });
+    expect(out[0]).toEqual({ month: '2026-07-01', netWorth: 1000, reserved: 4000 });
   });
 });
 

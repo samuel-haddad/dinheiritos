@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import AuthGate from '@/components/AuthGate';
 import EntityManager, { EntityConfig, Option } from '@/components/EntityManager';
-import Nav from '@/components/Nav';
+import Shell from '@/components/Shell';
 import Tabs from '@/components/Tabs';
 import { brl } from '@/lib/format';
 import { formatMonth } from '@/lib/engine/months';
@@ -24,11 +24,15 @@ const TYPE_LABEL: Record<string, string> = {
 const tooltipStyle = {
   background: 'var(--tooltip-bg)',
   border: '1px solid var(--tooltip-border)',
-  borderRadius: 8,
+  borderRadius: 10,
   color: 'var(--tooltip-text)',
-  fontSize: 12,
+  fontSize: 12.5,
 };
-const COLORS = ['#f97316', '#58a6e8', '#22c55e', '#e879f9', '#facc15', '#f87171', '#2dd4bf', '#a78bfa'];
+const axis = { fontSize: 11, fill: 'var(--muted)' } as const;
+const COLORS = [
+  'var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)',
+  '#8A9A5B', '#B08968', '#6B8F71', '#A66E4E',
+];
 
 function Investimentos() {
   const [tab, setTab] = useState(TABS[0]);
@@ -149,32 +153,32 @@ function Investimentos() {
 
   return (
     <>
-      <div className="mb-1 flex items-baseline justify-between">
-        <h1 className="text-xl font-bold">Investimentos</h1>
-        <span className="text-sm text-slate-500 dark:text-slate-400">
-          Total investido: <strong className="text-accent-600 dark:text-accent-400">{brl.format(summary.total)}</strong>
+      <div className="mb-5 flex items-baseline justify-between">
+        <span className="text-sm" style={{ color: 'var(--muted)' }}>
+          Total investido:{' '}
+          <strong className="num" style={{ color: 'var(--accent-strong)' }}>{brl.format(summary.total)}</strong>
         </span>
       </div>
 
-      <section className="card mb-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
+      <section className="card mb-5">
+        <h2 className="font-display mb-3.5 text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
           Evolução das posições
         </h2>
         {evolution.length < 2 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>
             O gráfico aparece a partir de dois meses de posições lançadas — continue registrando os
             fechamentos mensais.
           </p>
         ) : (
-          <div className="text-slate-600 dark:text-slate-300">
+          <div style={{ color: 'var(--ink)' }}>
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={evolution} margin={{ left: 12 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.3} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'currentColor' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'currentColor' }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
+                <XAxis dataKey="label" tick={axis} />
+                <YAxis tick={axis} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                 <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
                 <Legend />
-                <Line type="monotone" dataKey="Total" stroke="#f97316" strokeWidth={2.5} dot />
+                <Line type="monotone" dataKey="Total" stroke="var(--chart-1)" strokeWidth={2.5} dot />
                 {ownerNames.map((n, i) => (
                   <Line key={n} type="monotone" dataKey={n} stroke={COLORS[(i + 1) % COLORS.length]} strokeWidth={1.5} dot />
                 ))}
@@ -197,10 +201,9 @@ function Investimentos() {
 export default function Page() {
   return (
     <AuthGate>
-      <main className="mx-auto max-w-6xl p-4 md:p-8">
-        <Nav />
+      <Shell>
         <Investimentos />
-      </main>
+      </Shell>
     </AuthGate>
   );
 }

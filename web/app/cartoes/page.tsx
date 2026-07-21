@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import AuthGate from '@/components/AuthGate';
 import EntityManager, { EntityConfig, Option } from '@/components/EntityManager';
-import Nav from '@/components/Nav';
+import Shell from '@/components/Shell';
 import Tabs from '@/components/Tabs';
 import Toggle from '@/components/Toggle';
 import { brl } from '@/lib/format';
@@ -103,16 +103,13 @@ function Cartoes() {
 
   return (
     <>
-      <h1 className="mb-1 text-xl font-bold">Cartões e faturas</h1>
-      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+      <p className="mb-5 text-sm" style={{ color: 'var(--muted)' }}>
         A projeção usa a fatura real quando lançada; sem fatura, usa o valor-base do cartão.
       </p>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
         {tab === 'Faturas' && (
-          <div className="mb-4">
-            <Toggle on={emAberto} onChange={setEmAberto} onLabel="Em aberto" offLabel="Todas" />
-          </div>
+          <Toggle on={emAberto} onChange={setEmAberto} onLabel="Em aberto" offLabel="Todas" />
         )}
       </div>
       {tab === 'Faturas' ? (
@@ -132,10 +129,9 @@ function Cartoes() {
 export default function Page() {
   return (
     <AuthGate>
-      <main className="mx-auto max-w-6xl p-4 md:p-8">
-        <Nav />
+      <Shell>
         <Cartoes />
-      </main>
+      </Shell>
     </AuthGate>
   );
 }

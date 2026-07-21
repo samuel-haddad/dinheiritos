@@ -109,6 +109,8 @@ export interface InvestmentSnapshot {
   balance: number;
 }
 
+export type GoalCategory = 'gasto' | 'patrimonio';
+
 export interface Goal {
   id: string;
   profile_id: string;
@@ -119,6 +121,12 @@ export interface Goal {
   paused: boolean;
   start_month: Month;
   deadline: Month;
+  /**
+   * 'gasto': compromisso futuro que vai consumir patrimônio (reforma, viagem) — entra no
+   * desconto do Patrimônio Projetado (docs/PROJECTION_ENGINE.md §1). 'patrimonio': construção
+   * de patrimônio (reserva, previdência) — não desconta. Não muda a alocação/aporte (§2).
+   */
+  category: GoalCategory;
 }
 
 export interface MonthlyProjection {

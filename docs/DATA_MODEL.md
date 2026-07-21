@@ -155,8 +155,11 @@ Ex.: empréstimo, obra do jardim, 13º de funcionárias. *(planilha: `previsoes`
 | paused | boolean | fora da alocação |
 | start_month | date | |
 | deadline | date | |
+| category | text | `gasto` \| `patrimonio` (migration 0006), default `patrimonio` |
 
 Campos calculados (posição atual, faltante, aporte mínimo, status/alcance) **não são colunas**: a posição vem do **patrimônio** (contas + investimentos) distribuído por prazo, com teto no alvo e excedente cascateando (`docs/PROJECTION_ENGINE.md` §2). As colunas `weight` (legada) e `achieved` foram removidas na migration 0005, e a tabela `goal_contributions` foi descontinuada — não há mais aportes manuais.
+
+`category` **não** muda a alocação/aporte (§2 continua igual para as duas categorias) — só é usada no cálculo do Patrimônio Projetado ajustado (`docs/PROJECTION_ENGINE.md` §1): metas `gasto` não pausadas têm o valor já reservado a elas descontado do patrimônio bruto, mês a mês, porque esse valor está comprometido com um gasto futuro e não é patrimônio disponível.
 
 ## Projeção (cache)
 

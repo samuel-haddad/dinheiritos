@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import AuthGate from '@/components/AuthGate';
 import EntityManager, { ColumnDef, EntityConfig, FieldDef, Option } from '@/components/EntityManager';
-import Nav from '@/components/Nav';
+import Shell from '@/components/Shell';
 import Tabs from '@/components/Tabs';
 import Toggle from '@/components/Toggle';
 import { brl } from '@/lib/format';
@@ -176,16 +176,13 @@ function Lancamentos() {
 
   return (
     <>
-      <h1 className="mb-1 text-xl font-bold">Lançamentos</h1>
-      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+      <p className="mb-5 text-sm" style={{ color: 'var(--muted)' }}>
         Os insumos do motor de projeção. Mudou um salário ou despesa fixa? Encerre a vigência do
         registro atual e crie um novo — o histórico fica preservado.
       </p>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
-        <div className="mb-4">
-          <Toggle on={showActive} onChange={setShowActive} onLabel="Ativas" offLabel="Desativadas" />
-        </div>
+        <Toggle on={showActive} onChange={setShowActive} onLabel="Ativas" offLabel="Desativadas" />
       </div>
       <EntityManager
         key={tab}
@@ -199,10 +196,9 @@ function Lancamentos() {
 export default function Page() {
   return (
     <AuthGate>
-      <main className="mx-auto max-w-6xl p-4 md:p-8">
-        <Nav />
+      <Shell>
         <Lancamentos />
-      </main>
+      </Shell>
     </AuthGate>
   );
 }

@@ -34,8 +34,14 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     id: 'patrimonio',
     term: 'Patrimônio projetado',
-    formula: 'último snapshot (contas + investimentos) + Σ saldos livres futuros',
-    desc: 'Parte da última posição real registrada e acumula o saldo livre projetado de cada mês seguinte. Quando um mês é fechado com valores reais, a linha "real" substitui a projeção.',
+    formula: '(último snapshot + Σ saldos livres futuros) − reservado p/ metas de gasto',
+    desc: 'Parte da última posição real registrada, acumula o saldo livre projetado de cada mês seguinte, e desconta o quanto já está reservado para metas de categoria "gasto" (ver Categoria da meta) — esse dinheiro está comprometido com um gasto futuro, não é patrimônio disponível. Quando um mês é fechado com valores reais, a linha "real" substitui a projeção.',
+  },
+  {
+    id: 'categoria-meta',
+    term: 'Categoria da meta',
+    formula: 'gasto | patrimônio',
+    desc: '"Gasto": um compromisso futuro que vai consumir patrimônio (reforma, viagem) — o quanto já está reservado para ela é descontado do Patrimônio projetado. "Patrimônio": construção de patrimônio (reserva, previdência) — não desconta. A categoria não muda como a meta recebe aporte/posição, só como ela entra nesse cálculo.',
   },
   {
     id: 'aporte-minimo',

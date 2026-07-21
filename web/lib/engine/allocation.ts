@@ -197,6 +197,55 @@ export function planGoals(
   return { statuses, monthly, alerts };
 }
 
+export interface NetWorthPoint {
+  month: Month;
+  netWorth: number;
+}
+
+export interface ProjectedWealthPoint {
+  month: Month;
+  /** Patrimônio bruto menos o reservado para metas de gasto (docs/PROJECTION_ENGINE.md §1). */
+  netWorth: number;
+  /** Quanto do patrimônio bruto está reservado para metas de gasto neste mês. */
+  reserved: number;
+}
+
+/**
+ * Patrimônio Projetado ajustado (docs/PROJECTION_ENGINE.md §1): desconta do patrimônio
+ * bruto o valor já reservado, mês a mês, para metas de categoria `gasto` não pausadas.
+ * Não muda a alocação em si — `plan` é o resultado normal de `planGoals`, sem alterações;
+ * esta função só lê esse resultado. `rawNetWorth` deve estar em ordem cronológica.
+ */
+export function projectedWealth(
+  rawNetWorth: NetWorthPoint[],
+  goals: Goal[],
+  plan: GoalPlan
+): ProjectedWealthPoint[] {
+  const spendingGoals = goals.filter((g) => g.category === 'gasto' && !g.paused);
+  if (spendingGoals.length === 0) {
+    return rawNetWorth.map((p) => ({ month: p.month, netWorth: p.netWorth, reserved: 0 }));
+  }
+
+  const statusByGoal = new Map(plan.statuses.map((s) => [s.goal.id, s]));
+  const reservedByGoal = new Map(
+    spendingGoals.map((g) => [g.id, statusByGoal.get(g.id)?.current ?? 0])
+  );
+  const allocByMonth = new Map(
+    plan.monthly.map((m) => [m.month, new Map(m.perGoal.map((p) => [p.goalId, p.amount]))])
+  );
+
+  return rawNetWorth.map((p) => {
+    let reserved = 0;
+    for (const g of spendingGoals) {
+      const add = allocByMonth.get(p.month)?.get(g.id) ?? 0;
+      const next = Math.min(Number(g.target_amount), (reservedByGoal.get(g.id) ?? 0) + add);
+      reservedByGoal.set(g.id, next);
+      reserved += next;
+    }
+    return { month: p.month, netWorth: r2(p.netWorth - reserved), reserved: r2(reserved) };
+  });
+}
+
 /** Horizonte que a simulação precisa: até o último prazo ativo (cap 300 meses). */
 export function requiredHorizon(goals: Goal[], refMonth: Month): number {
   const active = goals.filter((g) => !g.paused);

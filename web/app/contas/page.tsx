@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AuthGate from '@/components/AuthGate';
 import EntityManager, { EntityConfig, Option } from '@/components/EntityManager';
-import Nav from '@/components/Nav';
+import Shell from '@/components/Shell';
 import Tabs from '@/components/Tabs';
 import { brl } from '@/lib/format';
 import { formatMonth } from '@/lib/engine/months';
@@ -123,19 +123,18 @@ function Contas() {
 
   return (
     <>
-      <h1 className="mb-1 text-xl font-bold">Contas</h1>
-      <div className="mb-4 grid gap-3 md:grid-cols-2">
+      <div className="mb-5 grid gap-4 md:grid-cols-2">
         {summary.map((g) => (
-          <div key={g.name} className="card !p-4">
-            <div className="mb-2 flex items-baseline justify-between">
-              <h2 className="font-semibold">{g.name}</h2>
-              <span className="font-bold text-accent-600 dark:text-accent-400">{brl.format(g.total)}</span>
+          <div key={g.name} className="card !p-5">
+            <div className="mb-2.5 flex items-baseline justify-between">
+              <h2 className="font-display font-semibold" style={{ color: 'var(--ink)' }}>{g.name}</h2>
+              <span className="num font-display font-bold" style={{ color: 'var(--accent-strong)' }}>{brl.format(g.total)}</span>
             </div>
-            <ul className="space-y-1 text-sm text-slate-500 dark:text-slate-400">
+            <ul className="space-y-1 text-sm" style={{ color: 'var(--muted)' }}>
               {g.items.map(({ acc, snap }) => (
                 <li key={acc.id} className="flex justify-between">
                   <span>{acc.name}</span>
-                  <span className="tabular-nums">
+                  <span className="num">
                     {brl.format(Number(snap.balance))}{' '}
                     <span className="text-xs">({formatMonth(snap.month)})</span>
                   </span>
@@ -158,10 +157,9 @@ function Contas() {
 export default function Page() {
   return (
     <AuthGate>
-      <main className="mx-auto max-w-6xl p-4 md:p-8">
-        <Nav />
+      <Shell>
         <Contas />
-      </main>
+      </Shell>
     </AuthGate>
   );
 }

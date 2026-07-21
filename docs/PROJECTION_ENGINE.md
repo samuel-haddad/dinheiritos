@@ -35,11 +35,30 @@ expenses(M) = Σ recurring_expenses ativas em M
 free_balance(M) = income(M) − expenses(M)
 ```
 
-**Patrimônio** — para meses passados/atual, soma dos últimos snapshots de contas + investimentos. Para meses futuros:
+**Patrimônio bruto** — para meses passados/atual, soma dos últimos snapshots de contas + investimentos. Para meses futuros:
 
 ```
 net_worth(M) = net_worth(M−1) + free_balance(M)
 ```
+
+**Patrimônio Projetado (ajustado)** — o patrimônio bruto acima inclui dinheiro já
+comprometido com metas de categoria `gasto` (reforma, viagem — ver `docs/DATA_MODEL.md`),
+que não é patrimônio disponível. A métrica exibida no app desconta, mês a mês, o quanto já
+está **reservado** para essas metas:
+
+```
+reserved(meta, M) = min(target_amount, reserved(meta, M−1) + aporte(meta, M))
+reserved(meta, start) = posição inicial da meta (distributeNetWorth, §2)
+
+projected_wealth(M) = net_worth(M) − Σ reserved(meta, M), para toda meta `gasto` não pausada
+```
+
+`aporte(meta, M)` vem da simulação de alocação (§2) — a mesma, sem mudanças: metas `gasto`
+continuam competindo por aporte mínimo e excedente exatamente como metas `patrimonio`. O
+ajuste é só uma leitura sobre o resultado, feita por `projectedWealth` (`lib/engine/allocation.ts`).
+Metas `gasto` pausadas não entram no desconto (mesma regra de pausa do resto do motor).
+Meses fechados (`monthly_projections.is_closed = true`) guardam o patrimônio real observado
+e não passam por este ajuste.
 
 ## 2. Motor de alocação de metas (v2 — sem pesos, sem aportes manuais)
 

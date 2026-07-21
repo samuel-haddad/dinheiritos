@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import AuthGate from '@/components/AuthGate';
-import Nav from '@/components/Nav';
+import Shell from '@/components/Shell';
 import { GLOSSARY } from '@/lib/glossary';
 
 function GlossaryPage() {
+  const [query, setQuery] = useState('');
+
   // Ao chegar com uma âncora (#id), centraliza a definição na tela.
   useEffect(() => {
     const center = () => {
@@ -14,8 +16,8 @@ function GlossaryPage() {
       const el = document.getElementById(id);
       if (el) {
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        el.classList.add('ring-2', 'ring-accent-500/50');
-        setTimeout(() => el.classList.remove('ring-2', 'ring-accent-500/50'), 1600);
+        el.classList.add('ring-2', 'ring-[var(--accent)]');
+        setTimeout(() => el.classList.remove('ring-2', 'ring-[var(--accent)]'), 1600);
       }
     };
     center();
@@ -23,22 +25,40 @@ function GlossaryPage() {
     return () => window.removeEventListener('hashchange', center);
   }, []);
 
+  const q = query.trim().toLowerCase();
+  const results = q
+    ? GLOSSARY.filter((e) => e.term.toLowerCase().includes(q) || e.desc.toLowerCase().includes(q))
+    : GLOSSARY;
+
   return (
     <>
-      <h1 className="mb-1 text-xl font-bold">Glossário</h1>
-      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
-        Como cada número do Dinheiritos é calculado. Os ⓘ espalhados pelo app apontam para cá.
-      </p>
-      <div className="space-y-4">
-        {GLOSSARY.map((e) => (
-          <section key={e.id} id={e.id} className="card scroll-mt-[40vh] transition-shadow">
-            <h2 className="font-semibold">{e.term}</h2>
-            <p className="mt-1 rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600 dark:bg-navy-900 dark:text-slate-300">
+      <div className="mb-6 max-w-[380px]">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar termo…"
+          className="input !rounded-2xl"
+        />
+      </div>
+      <div className="flex flex-col gap-3.5">
+        {results.map((e) => (
+          <section
+            key={e.id}
+            id={e.id}
+            className="card scroll-mt-[40vh] transition-shadow"
+            style={{ boxShadow: '0 1px 2px var(--shadow-sm), 0 8px 24px -14px var(--shadow-lg)' }}
+          >
+            <p className="font-display m-0 mb-1 font-semibold" style={{ color: 'var(--ink)' }}>{e.term}</p>
+            <p className="m-0 mb-2 font-mono text-[12.5px]" style={{ color: 'var(--accent-strong)' }}>
               {e.formula}
             </p>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{e.desc}</p>
+            <p className="m-0 text-[13.5px]" style={{ color: 'var(--muted)' }}>{e.desc}</p>
           </section>
         ))}
+        {results.length === 0 && (
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nenhum termo encontrado para &quot;{query}&quot;.</p>
+        )}
       </div>
     </>
   );
@@ -47,10 +67,9 @@ function GlossaryPage() {
 export default function Page() {
   return (
     <AuthGate>
-      <main className="mx-auto max-w-3xl p-4 md:p-8">
-        <Nav />
+      <Shell>
         <GlossaryPage />
-      </main>
+      </Shell>
     </AuthGate>
   );
 }
