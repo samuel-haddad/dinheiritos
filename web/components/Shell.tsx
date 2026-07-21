@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -100,14 +101,31 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const profiles = useProfiles();
   const current = LINKS.find((l) => path === l.href || path === l.href.replace(/\/$/, '')) ?? LINKS[0];
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const p1 = profiles[0] ? profileName(profiles, profiles[0].id) : 'Samuel';
   const p2 = profiles[1] ? profileName(profiles, profiles[1].id) : 'Ivana';
 
+  // Close the drawer whenever the route changes.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [path]);
+
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Backdrop for mobile drawer */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+          onClick={() => setMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       <aside
-        className="flex w-[250px] flex-none flex-col border-r px-5 py-7"
+        className={`fixed inset-y-0 left-0 z-30 flex w-[250px] flex-none flex-col border-r px-5 py-7 transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 ${
+          menuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
         style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}
       >
         <div className="flex items-center gap-[11px] px-1.5 pb-[30px] pt-1">
@@ -115,9 +133,19 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           <span className="font-display text-[20px] font-bold tracking-tight" style={{ color: 'var(--ink)' }}>
             Dinheiritos
           </span>
+          <button
+            onClick={() => setMenuOpen(false)}
+            className="ml-auto rounded-lg p-1.5 md:hidden"
+            style={{ color: 'var(--muted)' }}
+            aria-label="Fechar menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+              <path d="M5 5l10 10M15 5L5 15" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-[3px]">
+        <nav className="flex flex-1 flex-col gap-[3px] overflow-y-auto">
           {LINKS.map((l) => {
             const active = l.href === current.href;
             return (
@@ -161,9 +189,20 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
-        <header className="flex max-w-[1100px] items-start gap-5 px-10 pb-2 pt-[34px]">
+        <header className="flex max-w-[1100px] items-start gap-3 px-5 pb-2 pt-[20px] md:gap-5 md:px-10 md:pt-[34px]">
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="mt-1 flex-none rounded-lg p-1.5 md:hidden"
+            style={{ color: 'var(--ink)' }}
+            aria-label="Abrir menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+              <path d="M3 5.5h14M3 10h14M3 14.5h14" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+
           <div className="min-w-0 flex-1">
-            <h1 className="font-display m-0 text-[32px] font-bold tracking-tight" style={{ color: 'var(--ink)' }}>
+            <h1 className="font-display m-0 text-[24px] font-bold tracking-tight md:text-[32px]" style={{ color: 'var(--ink)' }}>
               {current.label}
             </h1>
             <p className="m-0 mt-1.5 max-w-[640px] text-[14.5px]" style={{ color: 'var(--muted)' }}>
@@ -182,7 +221,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="max-w-[1100px] px-10 pb-[90px] pt-6">{children}</div>
+        <div className="max-w-[1100px] px-5 pb-[90px] pt-6 md:px-10">{children}</div>
       </main>
     </div>
   );
