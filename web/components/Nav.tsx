@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -19,32 +20,76 @@ const links = [
 
 export default function Nav() {
   const path = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
-    <nav className="mb-6 flex flex-wrap items-center gap-1 border-b border-slate-200 pb-3 dark:border-navy-700">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={asset('/logo.png')} alt="Dinheiritos" className="mr-3 h-9 w-9 rounded-lg object-cover" />
-      {links.map((l) => {
-        const active = path === l.href || path === l.href.replace(/\/$/, '');
-        return (
-          <Link
-            key={l.href}
-            href={l.href}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-              active
-                ? 'bg-accent-600/10 text-accent-600 dark:bg-accent-500/15 dark:text-accent-400'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-navy-700'
-            }`}
+    <>
+      <nav className="mb-6 flex items-center gap-1 border-b border-slate-200 pb-3 dark:border-navy-700">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={asset('/logo.png')} alt="Dinheiritos" className="mr-3 h-9 w-9 rounded-lg object-cover" />
+
+        {/* Desktop Navigation */}
+        <div className="hidden flex-wrap gap-1 md:flex">
+          {links.map((l) => {
+            const active = path === l.href || path === l.href.replace(/\/$/, '');
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                  active
+                    ? 'bg-accent-600/10 text-accent-600 dark:bg-accent-500/15 dark:text-accent-400'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-navy-700'
+                }`}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="ml-auto flex items-center gap-1">
+          <ThemeToggle />
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="md:hidden rounded-lg px-2 py-1.5 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-navy-700"
+            aria-label="Toggle menu"
           >
-            {l.label}
-          </Link>
-        );
-      })}
-      <div className="ml-auto flex items-center gap-1">
-        <ThemeToggle />
-        <button onClick={() => supabase().auth.signOut()} className="btn-ghost">
-          Sair
-        </button>
-      </div>
-    </nav>
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          <button onClick={() => supabase().auth.signOut()} className="btn-ghost">
+            Sair
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile Navigation Drawer */}
+      {menuOpen && (
+        <div className="mb-6 space-y-2 md:hidden">
+          {links.map((l) => {
+            const active = path === l.href || path === l.href.replace(/\/$/, '');
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setMenuOpen(false)}
+                className={`block rounded-lg px-4 py-2 text-sm font-medium ${
+                  active
+                    ? 'bg-accent-600/10 text-accent-600 dark:bg-accent-500/15 dark:text-accent-400'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-navy-700'
+                }`}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </>
   );
 }

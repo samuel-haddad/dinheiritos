@@ -4,7 +4,7 @@
 - [x] Estrutura do repositório e documentação
 - [x] Modelo de dados definido
 - [x] Schema aplicado no projeto Supabase estudo-tcdf (ver CLAUDE.md)
-- [ ] Usuários de Auth (Samuel, Ivana) criados no painel do Supabase
+- [x] Usuários de Auth (Samuel, Ivana) criados no painel do Supabase
 
 ## Fase 1 — Dados ✅
 - [x] Migração dos dados legados (16/07/2026, validada contra a aba `saldo`)
@@ -16,7 +16,7 @@
 - [x] Dashboard prospectivo: saldo livre por mês (24 meses) + patrimônio
 - [x] Tela de metas com progresso e aporte necessário
 - [x] Workflow de deploy no GitHub Pages
-- [ ] Publicar: criar usuários de Auth, setar variáveis no GitHub e ativar Pages
+- [x] Publicar: criar usuários de Auth, setar variáveis no GitHub e ativar Pages
 
 ## Fase 3 — Alocação e gestão
 - [x] Motor de alocação v2: aporte mínimo automático + prioridade (fim dos pesos)
@@ -27,7 +27,7 @@
 - [x] Evolução dos investimentos (total e por pessoa)
 - [ ] Métricas de previsto vs realizado, acurácia, taxa de poupança, runway
 - [ ] Fluxo "Fechar mês" guiado (um clique para lançar tudo do mês)
-- [ ] Redesign visual no Claude Design (backlog)
+- [x] Redesign visual no Claude Design (backlog)
 
 ## Fase 4 — IA Financial Advisor
 - [ ] Edge Function: JSON (mês atual + 6 meses projetados) → Anthropic API
@@ -86,4 +86,4 @@ Mudança conceitual: a posição da meta deixa de vir de aportes registrados e p
 
 - [x] **Detalhe da meta** (`web/app/metas/page.tsx`): clicar numa meta abre um modal com as infos (alvo, prazo, responsável, posição, faltante, aporte mínimo, conclusão projetada) e um **gráfico de barras empilhadas mês a mês** — posição acumulada + aporte estimado do mês, com o topo de um mês virando a posição do seguinte, e linha do alvo. Usa `plan.monthly[].perGoal` da simulação.
 - [x] **Evolução das metas (linhas, 24m)** (`web/app/metas/page.tsx`): gráfico de linhas na tela de Metas com a posição projetada de cada meta mês a mês nos próximos 24 meses (uma linha por meta), a partir de `plan.monthly` + posição inicial.
-- [ ] Atualizar em Contas os saldos atuais de BB, Caixa e Santander (snapshots defasados em 2026-01) para o patrimônio de partida ficar exato.
+- [x] Atualizar em Contas os saldos atuais de BB, Caixa e Santander (snapshots defasados em 2026-01) para o patrimônio de partida ficar exato.
