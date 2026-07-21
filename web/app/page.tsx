@@ -53,7 +53,8 @@ function Dashboard() {
       data.goals,
       currentNetWorth(data),
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
-      startMonth
+      startMonth,
+      data.allocationMode
     );
     // Patrimônio Projetado ajustado: desconta o reservado para metas de categoria "gasto"
     // (docs/PROJECTION_ENGINE.md §1). Metas "patrimonio" não afetam este número.

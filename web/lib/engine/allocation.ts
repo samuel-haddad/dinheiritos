@@ -1,11 +1,16 @@
 // Motor de alocação de metas v2 — função pura (ver docs/PROJECTION_ENGINE.md §2).
 //
-// Sem pesos. Cada meta ativa tem um APORTE MÍNIMO autoajustável:
-//   AM(meta, mês) = faltante ÷ meses até o prazo
-// A cada mês simulado: todas as metas ativas recebem seu AM (se o saldo
-// permitir); o excedente vai para a meta de prazo mais próximo; em déficit,
-// financia-se na ordem de prioridade (menor primeiro, empate por prazo).
-import type { Goal, Month } from '../types';
+// Sem pesos. Dois modos de distribuição, escolhidos pelo usuário (AllocationMode):
+//
+//   'am' (Aporte Mínimo): cada meta ativa tem um APORTE MÍNIMO autoajustável
+//     AM(meta, mês) = faltante ÷ meses até o prazo. A cada mês simulado todas as
+//     metas ativas recebem seu AM (se o saldo permitir); o excedente vai para a
+//     meta de prazo mais próximo; em déficit, financia-se na ordem de prioridade.
+//
+//   'priority' (Prioridade): todo o saldo livre do mês vai para a meta de maior
+//     prioridade (menor `priority`) até completá-la; o excedente cascateia para a
+//     próxima. Não há aporte mínimo nem déficit — só a ordem de prioridade importa.
+import type { AllocationMode, Goal, Month } from '../types';
 import { addMonths, diffMonths } from './months';
 
 export type GoalHealth = 'achieved' | 'paused' | 'on_track' | 'late' | 'infeasible';
@@ -42,17 +47,31 @@ export interface FreeBalancePoint {
   freeBalance: number;
 }
 
+/** Ordena metas ativas conforme o modo: por prazo (am) ou por prioridade (priority). */
+function orderGoals(goals: Goal[], mode: AllocationMode): Goal[] {
+  const byDeadline = (a: Goal, b: Goal) =>
+    a.deadline.localeCompare(b.deadline) || a.priority - b.priority;
+  const byPriority = (a: Goal, b: Goal) =>
+    a.priority - b.priority || a.deadline.localeCompare(b.deadline);
+  return [...goals].sort(mode === 'priority' ? byPriority : byDeadline);
+}
+
 /**
  * Posição atual das metas (5.3): distribui o patrimônio (contas + investimentos)
- * entre as metas ativas na ordem de prazo mais próximo (empate por prioridade),
- * com teto no valor-alvo — o excedente cascateia para a próxima meta.
- * Metas pausadas não recebem posição.
+ * entre as metas ativas, com teto no valor-alvo — o excedente cascateia para a
+ * próxima meta. A ordem segue o modo: prazo mais próximo (`am`) ou prioridade
+ * (`priority`). Metas pausadas não recebem posição.
  */
-export function distributeNetWorth(goals: Goal[], netWorth: number): Map<string, number> {
+export function distributeNetWorth(
+  goals: Goal[],
+  netWorth: number,
+  mode: AllocationMode = 'am'
+): Map<string, number> {
   const positions = new Map<string, number>();
-  const ordered = goals
-    .filter((g) => !g.paused)
-    .sort((a, b) => a.deadline.localeCompare(b.deadline) || a.priority - b.priority);
+  const ordered = orderGoals(
+    goals.filter((g) => !g.paused),
+    mode
+  );
   let capacity = Math.max(0, Number(netWorth) || 0);
   for (const g of ordered) {
     const take = Math.min(Number(g.target_amount), capacity);
@@ -71,11 +90,12 @@ export function planGoals(
   goals: Goal[],
   netWorth: number,
   freeBalances: FreeBalancePoint[],
-  refMonth: Month
+  refMonth: Month,
+  mode: AllocationMode = 'am'
 ): GoalPlan {
   const alerts: string[] = [];
 
-  const positions = distributeNetWorth(goals, netWorth);
+  const positions = distributeNetWorth(goals, netWorth, mode);
   const base = goals.map((goal) => {
     const current = positions.get(goal.id) ?? 0;
     const remaining = Math.max(0, Number(goal.target_amount) - current);
@@ -100,42 +120,63 @@ export function planGoals(
 
     let capacity = Math.max(0, Number(point.freeBalance));
     const allocs = new Map<string, number>();
-    const needs = active.map((s) => ({
-      s,
-      need: Math.min(s.remaining, am(s.remaining, month, s.goal.deadline)),
-    }));
-    const totalNeed = needs.reduce((t, n) => t + n.need, 0);
-
     let deficit = 0;
-    if (capacity + EPS >= totalNeed) {
-      // 1) todos recebem seu AM
-      for (const { s, need } of needs) allocs.set(s.goal.id, need);
-      capacity -= totalNeed;
-      // 2) excedente → prazo mais próximo, com teto no faltante, em cascata
-      const byDeadline = [...active].sort((a, b) => a.goal.deadline.localeCompare(b.goal.deadline));
-      for (const s of byDeadline) {
+
+    if (mode === 'priority') {
+      // Prioridade: todo o saldo livre vai para a meta de maior prioridade (menor
+      // `priority`) até completá-la; o excedente cascateia para a próxima. Sem AM,
+      // sem déficit — nenhuma meta tem "aporte mínimo" a cumprir.
+      const byPriority = orderGoals(
+        active.map((s) => s.goal),
+        'priority'
+      );
+      for (const goal of byPriority) {
         if (capacity <= EPS) break;
-        const already = allocs.get(s.goal.id) ?? 0;
-        const room = s.remaining - already;
-        const extra = Math.min(room, capacity);
-        if (extra > EPS) {
-          allocs.set(s.goal.id, already + extra);
-          capacity -= extra;
+        const s = sim.get(goal.id)!;
+        const take = Math.min(s.remaining, capacity);
+        if (take > EPS) {
+          allocs.set(goal.id, take);
+          capacity -= take;
         }
       }
     } else {
-      // Déficit: financia na ordem de prioridade (empate: prazo mais próximo)
-      deficit = totalNeed - capacity;
-      const byPriority = [...needs].sort(
-        (a, b) =>
-          a.s.goal.priority - b.s.goal.priority ||
-          a.s.goal.deadline.localeCompare(b.s.goal.deadline)
-      );
-      for (const { s, need } of byPriority) {
-        if (capacity <= EPS) break;
-        const amount = Math.min(need, capacity);
-        allocs.set(s.goal.id, amount);
-        capacity -= amount;
+      // Aporte Mínimo (comportamento anterior)
+      const needs = active.map((s) => ({
+        s,
+        need: Math.min(s.remaining, am(s.remaining, month, s.goal.deadline)),
+      }));
+      const totalNeed = needs.reduce((t, n) => t + n.need, 0);
+
+      if (capacity + EPS >= totalNeed) {
+        // 1) todos recebem seu AM
+        for (const { s, need } of needs) allocs.set(s.goal.id, need);
+        capacity -= totalNeed;
+        // 2) excedente → prazo mais próximo, com teto no faltante, em cascata
+        const byDeadline = [...active].sort((a, b) => a.goal.deadline.localeCompare(b.goal.deadline));
+        for (const s of byDeadline) {
+          if (capacity <= EPS) break;
+          const already = allocs.get(s.goal.id) ?? 0;
+          const room = s.remaining - already;
+          const extra = Math.min(room, capacity);
+          if (extra > EPS) {
+            allocs.set(s.goal.id, already + extra);
+            capacity -= extra;
+          }
+        }
+      } else {
+        // Déficit: financia na ordem de prioridade (empate: prazo mais próximo)
+        deficit = totalNeed - capacity;
+        const byPriority = [...needs].sort(
+          (a, b) =>
+            a.s.goal.priority - b.s.goal.priority ||
+            a.s.goal.deadline.localeCompare(b.s.goal.deadline)
+        );
+        for (const { s, need } of byPriority) {
+          if (capacity <= EPS) break;
+          const amount = Math.min(need, capacity);
+          allocs.set(s.goal.id, amount);
+          capacity -= amount;
+        }
       }
     }
 
@@ -207,10 +248,11 @@ export function goalPositionsAt(
   goals: Goal[],
   netWorth: number,
   monthly: MonthAllocation[],
-  month: Month
+  month: Month,
+  mode: AllocationMode = 'am'
 ): Map<string, number> {
   const targetById = new Map(goals.map((g) => [g.id, Number(g.target_amount)]));
-  const pos = new Map<string, number>(distributeNetWorth(goals, netWorth));
+  const pos = new Map<string, number>(distributeNetWorth(goals, netWorth, mode));
   for (const m of monthly) {
     if (m.month > month) break;
     for (const pg of m.perGoal) {

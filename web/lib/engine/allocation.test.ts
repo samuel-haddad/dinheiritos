@@ -140,6 +140,51 @@ describe('planGoals — saúde da meta', () => {
   });
 });
 
+describe('modo priority — cascata por prioridade', () => {
+  it('distributeNetWorth reparte o patrimônio na ordem de prioridade', () => {
+    const a = goal({ id: 'a', target_amount: 30000, deadline: '2026-12-01', priority: 2 });
+    const b = goal({ id: 'b', target_amount: 80000, deadline: '2027-06-01', priority: 1 });
+    const c = goal({ id: 'c', target_amount: 50000, deadline: '2028-12-01', priority: 3 });
+    const pos = distributeNetWorth([a, b, c], 100000, 'priority');
+    expect(pos.get('b')).toBe(80000); // prioridade 1: cheia primeiro
+    expect(pos.get('a')).toBe(20000); // prioridade 2: recebe o que sobra
+    expect(pos.get('c')).toBe(0); // prioridade 3: nada
+  });
+
+  it('todo o saldo livre vai à meta de maior prioridade, sem aporte mínimo nem déficit', () => {
+    const a = goal({ id: 'a', target_amount: 6000, deadline: '2028-07-01', priority: 2 });
+    const b = goal({ id: 'b', target_amount: 24000, deadline: '2028-07-01', priority: 1 });
+    const { monthly, statuses } = planGoals([a, b], 0, fb(30, 3000), '2026-07-01', 'priority');
+    const m0 = Object.fromEntries(monthly[0].perGoal.map((p) => [p.goalId, p.amount]));
+    expect(m0['b']).toBe(3000); // prioridade 1 leva tudo
+    expect(m0['a'] ?? 0).toBe(0); // prioridade 2 não recebe até b fechar
+    expect(monthly[0].deficit).toBe(0); // não há déficit no modo prioridade
+    // b conclui no mês 8 (24000/3000); só então a começa
+    expect(statuses.find((s) => s.goal.id === 'a')!.health).toBe('on_track');
+    expect(statuses.find((s) => s.goal.id === 'b')!.health).toBe('on_track');
+  });
+
+  it('excedente cascateia: se a meta prioritária fecha, a próxima recebe no mesmo mês', () => {
+    const a = goal({ id: 'a', target_amount: 1000, deadline: '2028-07-01', priority: 1 });
+    const b = goal({ id: 'b', target_amount: 9000, deadline: '2028-07-01', priority: 2 });
+    const { monthly } = planGoals([a, b], 0, fb(24, 5000), '2026-07-01', 'priority');
+    const m0 = Object.fromEntries(monthly[0].perGoal.map((p) => [p.goalId, p.amount]));
+    expect(m0['a']).toBe(1000); // fecha a (teto no alvo)
+    expect(m0['b']).toBe(4000); // excedente cascateia para b
+  });
+
+  it('goalPositionsAt segue a prioridade', () => {
+    const a = goal({ id: 'a', target_amount: 3000, deadline: '2028-07-01', priority: 1 });
+    const b = goal({ id: 'b', target_amount: 5000, deadline: '2028-07-01', priority: 2 });
+    const plan = planGoals([a, b], 0, fb(24, 1000), '2026-07-01', 'priority');
+    const p2 = goalPositionsAt([a, b], 0, plan.monthly, '2026-09-01', 'priority'); // 3 meses
+    expect(p2.get('a')).toBe(3000); // a (prioridade 1) já cheia
+    expect(p2.get('b')).toBe(0); // b ainda não começou
+    const p3 = goalPositionsAt([a, b], 0, plan.monthly, '2026-10-01', 'priority'); // 4º mês
+    expect(p3.get('b')).toBe(1000); // b começa após a fechar
+  });
+});
+
 describe('projectedWealth — patrimônio ajustado por metas de gasto', () => {
   const raw = [
     { month: '2026-07-01', netWorth: 5000 },

@@ -44,16 +44,22 @@ export const GLOSSARY: GlossaryEntry[] = [
     desc: '"Gasto": um compromisso futuro que vai consumir patrimônio (reforma, viagem) — o quanto já está reservado para ela é descontado do Patrimônio projetado. "Patrimônio": construção de patrimônio (reserva, previdência) — não desconta. A categoria não muda como a meta recebe aporte/posição, só como ela entra nesse cálculo.',
   },
   {
+    id: 'modo-alocacao',
+    term: 'Modo de distribuição dos aportes',
+    formula: 'Aporte Mínimo (AM) | Prioridade',
+    desc: 'Escolhido no topo da tela de Metas e vale para o app inteiro. "Aporte Mínimo": cada meta recebe o mínimo para fechar no prazo e o excedente vai à meta de prazo mais próximo. "Prioridade": todo o saldo livre vai para a meta de maior prioridade até 100%, depois cascateia para a próxima — não há aporte mínimo nem déficit, só a ordem de prioridade (definida na tela de Metas) decide. O modo também define como o patrimônio atual é atribuído às metas como posição inicial.',
+  },
+  {
     id: 'aporte-minimo',
     term: 'Aporte mínimo (AM)',
     formula: 'valor faltante da meta ÷ meses até o prazo',
-    desc: 'Recalculado todo mês: se você aportou menos num mês, o faltante sobe e o AM seguinte aumenta sozinho. É o número exato que mantém a meta no prazo — substituiu o antigo sistema de pesos.',
+    desc: 'Recalculado todo mês: se você aportou menos num mês, o faltante sobe e o AM seguinte aumenta sozinho. É o número exato que mantém a meta no prazo. Guia a distribuição no modo "Aporte Mínimo"; no modo "Prioridade" ele vira só uma referência (quanto seria preciso por mês para fechar no prazo), pois a distribuição segue a prioridade.',
   },
   {
     id: 'alocacao',
     term: 'Alocação sugerida',
-    formula: '1) cada meta ativa recebe seu AM; 2) excedente vai à meta de prazo mais próximo; 3) em déficit, a ordem de prioridade decide',
-    desc: 'Concluir antes a meta mais urgente libera caixa para as demais. A ordem de prioridade (definida na tela de Metas) só é usada quando o saldo livre não cobre a soma dos AMs.',
+    formula: 'depende do modo: Aporte Mínimo ou Prioridade',
+    desc: 'No modo Aporte Mínimo: 1) cada meta ativa recebe seu AM; 2) o excedente vai à meta de prazo mais próximo; 3) em déficit, a ordem de prioridade decide. No modo Prioridade: todo o saldo livre vai para a meta de maior prioridade até completá-la, depois cascateia para a próxima. A ordem de prioridade é definida na tela de Metas.',
   },
   {
     id: 'status-meta',

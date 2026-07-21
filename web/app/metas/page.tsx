@@ -9,12 +9,13 @@ import AuthGate from '@/components/AuthGate';
 import RotatedTick from '@/components/ChartAxisTick';
 import HealthChip from '@/components/HealthChip';
 import Shell from '@/components/Shell';
-import { AppData, brl, currentNetWorth, loadAppData } from '@/lib/data';
+import Toggle from '@/components/Toggle';
+import { AppData, brl, currentNetWorth, loadAppData, setAllocationMode } from '@/lib/data';
 import { GoalHealth, GoalStatus, MonthAllocation, planGoals, requiredHorizon } from '@/lib/engine/allocation';
 import { formatMonth, monthRange } from '@/lib/engine/months';
 import { defaultStartMonth, project } from '@/lib/engine/projection';
 import { supabase } from '@/lib/supabase';
-import type { Goal, GoalCategory } from '@/lib/types';
+import type { AllocationMode, Goal, GoalCategory } from '@/lib/types';
 
 const CATEGORY_LABEL: Record<GoalCategory, string> = { gasto: 'Gasto', patrimonio: 'Patrimônio' };
 const CATEGORY_HELP: Record<GoalCategory, string> = {
@@ -268,7 +269,7 @@ function GoalDetail({
 
 // ---------- card de meta ----------
 function GoalCard({
-  s, ownerName, onOpen, onEdit, onMove, onDelete, first, last, selected, onToggleSelect,
+  s, ownerName, onOpen, onEdit, onMove, onDelete, first, last, selected, onToggleSelect, priorityMode,
 }: {
   s: GoalStatus;
   ownerName: string;
@@ -280,6 +281,7 @@ function GoalCard({
   last: boolean;
   selected: boolean;
   onToggleSelect: () => void;
+  priorityMode: boolean;
 }) {
   const target = Number(s.goal.target_amount);
   const pct = Math.min(100, (s.current / target) * 100);
@@ -319,8 +321,13 @@ function GoalCard({
           </span>
           {active && (
             <span className="num" style={{ color: 'var(--muted)' }}>
-              mín. <strong style={{ color: 'var(--ink)' }}>{brl.format(s.requiredMonthly)}/mês</strong>
-              {' · '}sugerido{' '}
+              {!priorityMode && (
+                <>
+                  mín. <strong style={{ color: 'var(--ink)' }}>{brl.format(s.requiredMonthly)}/mês</strong>
+                  {' · '}
+                </>
+              )}
+              sugerido{' '}
               <strong style={{ color: 'var(--accent-strong)' }}>{brl.format(s.suggestedThisMonth)}</strong>
             </span>
           )}
@@ -364,11 +371,27 @@ function Goals() {
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [modeBusy, setModeBusy] = useState(false);
 
   const reload = useCallback(() => {
     loadAppData().then(setData).catch((e) => setError(String(e)));
   }, []);
   useEffect(reload, [reload]);
+
+  async function changeMode(mode: AllocationMode) {
+    if (!data || data.allocationMode === mode || modeBusy) return;
+    setModeBusy(true);
+    // Atualização otimista: reflete na hora; recarrega para confirmar.
+    setData({ ...data, allocationMode: mode });
+    try {
+      await setAllocationMode(mode);
+      reload();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setModeBusy(false);
+    }
+  }
 
   const engineInput = useMemo(() => {
     if (!data) return null;
@@ -392,7 +415,8 @@ function Goals() {
       data.goals,
       currentNetWorth(data),
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
-      refMonth
+      refMonth,
+      data.allocationMode
     );
     const ordered = [...plan.statuses].sort((a, b) => a.goal.priority - b.goal.priority);
 
@@ -439,7 +463,8 @@ function Goals() {
       simGoals,
       currentNetWorth(data),
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
-      refMonth
+      refMonth,
+      data.allocationMode
     );
     return plan.statuses.find((s) => s.goal.id === prospective.id) ?? null;
   }, [data, engineInput, editing]);
@@ -527,14 +552,29 @@ function Goals() {
     profile_id: data.profiles[0]?.id ?? '', paused: false, category: 'patrimonio',
   };
 
+  const isPriority = data.allocationMode === 'priority';
+
   return (
     <>
-      <div className="mb-5">
-        <p className="m-0 max-w-[720px] text-[13.5px]" style={{ color: 'var(--muted)' }}>
-          A posição de cada meta vem do patrimônio (contas + investimentos), distribuído por prazo
-          mais próximo, com teto no alvo — o excedente cascateia para as demais. A ordem abaixo só
-          desempata quando o saldo livre do mês não cobre todos os aportes mínimos.
-        </p>
+      <div className="card mb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display m-0 mb-1 text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+              Distribuição dos aportes
+            </h2>
+            <p className="m-0 max-w-[560px] text-[12.5px]" style={{ color: 'var(--muted)' }}>
+              {isPriority
+                ? 'Prioridade: todo o saldo livre vai para a meta de maior prioridade até 100%; o excedente cascateia para a próxima. A ordem das metas abaixo define quem recebe primeiro.'
+                : 'Aporte mínimo: cada meta ativa recebe o mínimo para fechar no prazo; o excedente vai à meta de prazo mais próximo. A prioridade só desempata quando o saldo não cobre todos os mínimos.'}
+            </p>
+          </div>
+          <Toggle
+            on={!isPriority}
+            onChange={(on) => changeMode(on ? 'am' : 'priority')}
+            onLabel="Aporte mínimo"
+            offLabel="Prioridade"
+          />
+        </div>
       </div>
 
       {view.plan.alerts.length > 0 && (
@@ -651,6 +691,7 @@ function Goals() {
             ownerName={nameOf(s.goal.profile_id)}
             first={i === 0}
             last={i === view.ordered.length - 1}
+            priorityMode={isPriority}
             selected={selected.has(s.goal.id)}
             onToggleSelect={() => toggleSelect(s.goal.id)}
             onOpen={() => setDetailingId(s.goal.id)}

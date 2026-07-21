@@ -146,7 +146,8 @@ function Resumo() {
       data.goals,
       netWorth,
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
-      startMonth
+      startMonth,
+      data.allocationMode
     );
     const wealth = projectedWealth(
       proj.map((p) => ({ month: p.month, netWorth: p.netWorth })),
@@ -159,7 +160,7 @@ function Resumo() {
     const monthWealth = wealth.find((w) => w.month === month) ?? null;
     const monthAlloc = plan.monthly.find((m) => m.month === month);
     const allocByGoal = new Map((monthAlloc?.perGoal ?? []).map((pg) => [pg.goalId, pg.amount]));
-    const positions = goalPositionsAt(data.goals, netWorth, plan.monthly, month);
+    const positions = goalPositionsAt(data.goals, netWorth, plan.monthly, month, data.allocationMode);
     const statusByGoal = new Map(plan.statuses.map((s) => [s.goal.id, s]));
 
     const goalRows = data.goals

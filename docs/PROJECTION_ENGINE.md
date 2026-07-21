@@ -54,7 +54,7 @@ projected_wealth(M) = net_worth(M) − Σ reserved(meta, M), para toda meta `gas
 ```
 
 `aporte(meta, M)` vem da simulação de alocação (§2) — a mesma, sem mudanças: metas `gasto`
-continuam competindo por aporte mínimo e excedente exatamente como metas `patrimonio`. O
+competem por aporte exatamente como metas `patrimonio`, seja qual for o `allocation_mode`. O
 ajuste é só uma leitura sobre o resultado, feita por `projectedWealth` (`lib/engine/allocation.ts`).
 Metas `gasto` pausadas não entram no desconto (mesma regra de pausa do resto do motor).
 Meses fechados (`monthly_projections.is_closed = true`) guardam o patrimônio real observado
@@ -65,12 +65,21 @@ e não passam por este ajuste.
 > Sem pesos (removidos na migration 0005) e sem aportes manuais. A **posição atual** de
 > cada meta é derivada do patrimônio; o prazo codifica a necessidade de caixa.
 
-**Posição atual (5.3):** `distributeNetWorth` reparte o patrimônio (contas + investimentos)
-entre as metas ativas na ordem de **prazo mais próximo** (empate por prioridade), com **teto
-no valor-alvo** — o excedente **cascateia** para a próxima meta. Metas pausadas não recebem
-posição. O **alcance** é calculado: posição ≥ alvo ⇒ `achieved`.
+### Modo de distribuição (`allocation_mode`, `app_settings`, migration 0007)
 
-**Aporte mínimo autoajustável (AM):**
+O usuário escolhe no topo da tela de Metas **como** o saldo livre e o patrimônio são
+distribuídos entre as metas. A escolha é global (linha única de `app_settings`, compartilhada
+pelos perfis) e ajusta **todos** os cálculos do app. O parâmetro `mode: AllocationMode`
+(`'am' | 'priority'`) é passado a `distributeNetWorth`, `planGoals` e `goalPositionsAt`
+(`lib/engine/allocation.ts`). Default `'am'` preserva o comportamento anterior.
+
+**Posição atual (5.3):** `distributeNetWorth` reparte o patrimônio (contas + investimentos)
+entre as metas ativas, com **teto no valor-alvo** — o excedente **cascateia** para a próxima
+meta. A **ordem** segue o modo: **prazo mais próximo** (empate por prioridade) no modo `am`;
+**prioridade** (menor primeiro, empate por prazo) no modo `priority`. Metas pausadas não
+recebem posição. O **alcance** é calculado: posição ≥ alvo ⇒ `achieved`.
+
+#### Modo `am` — Aporte Mínimo autoajustável
 
 ```
 AM(meta, M) = faltante(meta, M) / max(1, meses até o deadline)
@@ -79,13 +88,28 @@ faltante = target_amount − posição(meta)
 
 Recalculado a cada mês da simulação: sub-aportes num mês elevam o AM dos seguintes.
 
-**Distribuição do saldo livre de cada mês simulado:**
+Distribuição do saldo livre de cada mês simulado:
 
 1. Toda meta ativa (não alcançada, não pausada) recebe seu AM.
 2. **Excedente** → meta de prazo mais próximo (teto no faltante; cascata para a próxima). Concluir a meta urgente antes libera caixa para as demais.
-3. **Déficit** (saldo < Σ AMs) → financia na ordem de `goals.priority` (menor primeiro; empate: prazo mais próximo). Prioridade é a única decisão manual do usuário, e só importa neste caso.
+3. **Déficit** (saldo < Σ AMs) → financia na ordem de `goals.priority` (menor primeiro; empate: prazo mais próximo). Prioridade só importa neste caso.
 
-**Simulação e status:** a simulação roda até o último prazo ativo (cap 300 meses) sobre a série de saldos livres projetados, e produz por meta: conclusão projetada e status — `on_track` (conclui até o prazo), `late` (conclui depois), `infeasible` (não conclui no horizonte), `paused`, `achieved`. Se a simulação por prazo-mais-próximo não cumpre os prazos, nenhuma distribuição cumpre (otimalidade EDF) — o alerta de inviabilidade é exato, não heurístico.
+Se a simulação por prazo-mais-próximo não cumpre os prazos, nenhuma distribuição cumpre
+(otimalidade EDF) — o alerta de inviabilidade é exato, não heurístico.
+
+#### Modo `priority` — Cascata por prioridade
+
+Não há aporte mínimo nem déficit. A cada mês simulado, **todo** o saldo livre (se positivo)
+vai para a meta ativa de **maior prioridade** (menor `goals.priority`; empate por prazo) até
+completá-la; o **excedente cascateia** para a próxima meta na ordem de prioridade. Metas de
+menor prioridade só recebem aporte depois que as mais prioritárias chegam a 100%. O `AM`
+continua sendo calculado como **referência** (quanto seria preciso por mês para fechar no
+prazo), mas não guia a distribuição.
+
+**Simulação e status (ambos os modos):** a simulação roda até o último prazo ativo (cap 300
+meses) sobre a série de saldos livres projetados, e produz por meta: conclusão projetada e
+status — `on_track` (conclui até o prazo), `late` (conclui depois), `infeasible` (não conclui
+no horizonte), `paused`, `achieved`.
 
 A simulação usa alocações sugeridas apenas para meses futuros; não há aportes manuais persistidos.
 

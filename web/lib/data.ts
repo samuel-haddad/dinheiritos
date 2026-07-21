@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 import type {
   Account,
   AccountSnapshot,
+  AllocationMode,
   CardBill,
   CreditCard,
   Goal,
@@ -32,6 +33,8 @@ export interface AppData {
   investmentSnapshots: InvestmentSnapshot[];
   goals: Goal[];
   monthlyProjections: MonthlyProjection[];
+  /** Modo de distribuição de aportes escolhido pelo usuário (app_settings). */
+  allocationMode: AllocationMode;
 }
 
 async function all<T>(table: string, order?: string): Promise<T[]> {
@@ -41,11 +44,30 @@ async function all<T>(table: string, order?: string): Promise<T[]> {
   return (data ?? []) as T[];
 }
 
+/** Modo de alocação global (linha única de app_settings). Default 'am' se ausente. */
+export async function loadAllocationMode(): Promise<AllocationMode> {
+  const { data, error } = await supabase()
+    .from('app_settings')
+    .select('allocation_mode')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`app_settings: ${error.message}`);
+  return (data?.allocation_mode as AllocationMode) ?? 'am';
+}
+
+/** Grava o modo de alocação na linha única de app_settings. */
+export async function setAllocationMode(mode: AllocationMode): Promise<void> {
+  const { error } = await supabase()
+    .from('app_settings')
+    .upsert({ id: true, allocation_mode: mode, updated_at: new Date().toISOString() });
+  if (error) throw new Error(`app_settings: ${error.message}`);
+}
+
 export async function loadAppData(): Promise<AppData> {
   const [
     profiles, recurringIncomes, recurringExpenses, oneOffIncomes, plannedExpenses,
     accounts, accountSnapshots, creditCards, cardBills,
-    investments, investmentSnapshots, goals, monthlyProjections,
+    investments, investmentSnapshots, goals, monthlyProjections, allocationMode,
   ] = await Promise.all([
     all<Profile>('profiles'),
     all<RecurringIncome>('recurring_incomes'),
@@ -60,11 +82,12 @@ export async function loadAppData(): Promise<AppData> {
     all<InvestmentSnapshot>('investment_snapshots', 'month'),
     all<Goal>('goals'),
     all<MonthlyProjection>('monthly_projections', 'month'),
+    loadAllocationMode(),
   ]);
   return {
     profiles, recurringIncomes, recurringExpenses, oneOffIncomes, plannedExpenses,
     accounts, accountSnapshots, creditCards, cardBills,
-    investments, investmentSnapshots, goals, monthlyProjections,
+    investments, investmentSnapshots, goals, monthlyProjections, allocationMode,
   };
 }
 

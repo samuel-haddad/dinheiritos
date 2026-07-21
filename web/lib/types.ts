@@ -109,6 +109,14 @@ export interface InvestmentSnapshot {
   balance: number;
 }
 
+/**
+ * Modo de distribuição de aportes (docs/PROJECTION_ENGINE.md §2):
+ * 'am' — Aporte Mínimo autoajustável (cada meta recebe seu mínimo por prazo);
+ * 'priority' — todo o saldo livre vai para a meta de maior prioridade até 100%,
+ * depois cascateia para a próxima (menor priority = mais prioritária).
+ */
+export type AllocationMode = 'am' | 'priority';
+
 export type GoalCategory = 'gasto' | 'patrimonio';
 
 export interface Goal {
@@ -127,6 +135,10 @@ export interface Goal {
    * de patrimônio (reserva, previdência) — não desconta. Não muda a alocação/aporte (§2).
    */
   category: GoalCategory;
+}
+
+export interface AppSettings {
+  allocation_mode: AllocationMode;
 }
 
 export interface MonthlyProjection {

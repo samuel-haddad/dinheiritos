@@ -161,6 +161,21 @@ Campos calculados (posição atual, faltante, aporte mínimo, status/alcance) **
 
 `category` **não** muda a alocação/aporte (§2 continua igual para as duas categorias) — só é usada no cálculo do Patrimônio Projetado ajustado (`docs/PROJECTION_ENGINE.md` §1): metas `gasto` não pausadas têm o valor já reservado a elas descontado do patrimônio bruto, mês a mês, porque esse valor está comprometido com um gasto futuro e não é patrimônio disponível.
 
+## Configuração
+
+### `app_settings` — preferências globais (migration 0007)
+Linha única (singleton), compartilhada pelos perfis.
+
+| coluna | tipo | notas |
+|---|---|---|
+| id | boolean PK | sempre `true` (`check (id)`) — garante no máximo uma linha |
+| allocation_mode | text | `am` (Aporte Mínimo) \| `priority` (cascata por prioridade). Default `am` |
+| updated_at | timestamptz | |
+
+`allocation_mode` controla como o saldo livre e o patrimônio são distribuídos entre as metas
+(`docs/PROJECTION_ENGINE.md` §2). Afeta o app inteiro; é passado ao motor de alocação como
+`mode`. Gravado por upsert em `id = true` (`setAllocationMode`, `lib/data.ts`).
+
 ## Projeção (cache)
 
 ### `monthly_projections`

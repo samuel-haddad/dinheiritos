@@ -67,7 +67,8 @@ function Analises() {
       data.goals,
       currentNetWorth(data),
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
-      startMonth
+      startMonth,
+      data.allocationMode
     );
     const allocByMonth = new Map(
       plan.monthly.map((m) => [m.month, m.perGoal.reduce((s, g) => s + g.amount, 0)])
