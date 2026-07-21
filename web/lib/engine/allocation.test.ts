@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { distributeNetWorth, planGoals, projectedWealth, requiredHorizon, FreeBalancePoint } from './allocation';
+import { distributeNetWorth, goalPositionsAt, planGoals, projectedWealth, requiredHorizon, FreeBalancePoint } from './allocation';
 import { monthRange } from './months';
 import type { Goal } from '../types';
 
@@ -28,6 +28,27 @@ describe('distributeNetWorth — posição pelo patrimônio', () => {
     const pos = distributeNetWorth([a, b], 10000);
     expect(pos.get('a') ?? 0).toBe(0);
     expect(pos.get('b')).toBe(10000);
+  });
+});
+
+describe('goalPositionsAt — posição acumulada por mês', () => {
+  it('posição cresce com os aportes e nunca passa do alvo', () => {
+    // saldo livre = AM (1000): sem excedente para cascatear, a posição cresce em passos de 1000
+    const g = goal({ id: 'g', target_amount: 12000, deadline: '2027-07-01' }); // 12 meses → AM 1000
+    const plan = planGoals([g], 0, fb(24, 1000), '2026-07-01');
+    const p0 = goalPositionsAt([g], 0, plan.monthly, '2026-07-01');
+    const p3 = goalPositionsAt([g], 0, plan.monthly, '2026-10-01');
+    const pEnd = goalPositionsAt([g], 0, plan.monthly, '2027-12-01');
+    expect(p0.get('g')).toBe(1000); // 1 aporte
+    expect(p3.get('g')).toBe(4000); // 4 aportes
+    expect(pEnd.get('g')).toBe(12000); // teto no alvo
+  });
+
+  it('parte da posição inicial do patrimônio', () => {
+    const g = goal({ id: 'g', target_amount: 12000, deadline: '2027-07-01' }); // faltante 6000 → AM 500
+    const plan = planGoals([g], 6000, fb(24, 500), '2026-07-01');
+    const p0 = goalPositionsAt([g], 6000, plan.monthly, '2026-07-01');
+    expect(p0.get('g')).toBe(6500); // 6000 inicial + 500 do mês
   });
 });
 

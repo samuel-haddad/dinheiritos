@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { project } from './projection';
+import { monthDetail, project } from './projection';
 import { addMonths, diffMonths, formatMonth, inRange, monthRange, toMonth } from './months';
 import type { CreditCard, PlannedExpense, RecurringExpense, RecurringIncome } from '../types';
 
@@ -139,5 +139,39 @@ describe('project', () => {
   it('despesa inativa não conta', () => {
     const out = project({ ...base, recurringExpenses: [re({ active: false })] });
     expect(out[0].totalExpenses).toBe(0);
+  });
+});
+
+describe('monthDetail', () => {
+  const input = {
+    ...base,
+    recurringIncomes: [ri({ id: 'i1', name: 'Salário', amount: 1000 })],
+    oneOffIncomes: [
+      { id: 'o1', profile_id: 'p', name: '13º', amount: 500, expected_date: '2026-07-20', confirmed: false, active: true },
+    ],
+    recurringExpenses: [re({ id: 'e1', name: 'Condomínio', amount: 400 })],
+    plannedExpenses: [planned({ id: 'pl1', name: 'Obra', installment_amount: 100, start_month: '2026-07-01', end_month: '2026-10-01' })],
+    creditCards: [card({ id: 'c1', name: 'Santander', base_amount: 500 })],
+    cardBills: [{ id: 'b1', credit_card_id: 'c1', month: '2026-07-01', amount: 620 }],
+  };
+
+  it('lista cada lançamento e a soma bate com project()', () => {
+    const d = monthDetail(input, '2026-07-01');
+    expect(d.incomes.map((i) => i.name).sort()).toEqual(['13º', 'Salário']);
+    expect(d.expenses.map((e) => e.kind).sort()).toEqual(['card', 'planned', 'recurring']);
+    // fatura real (620) substitui o base_amount
+    expect(d.expenses.find((e) => e.kind === 'card')!.amount).toBe(620);
+
+    const agg = project({ ...input, horizon: 1 })[0];
+    const incomeSum = d.incomes.reduce((s, i) => s + i.amount, 0);
+    const expenseSum = d.expenses.reduce((s, e) => s + e.amount, 0);
+    expect(Math.round(incomeSum * 100) / 100).toBe(agg.totalIncome);
+    expect(Math.round(expenseSum * 100) / 100).toBe(agg.totalExpenses);
+  });
+
+  it('usa base_amount quando não há fatura', () => {
+    const d = monthDetail(input, '2026-08-01');
+    expect(d.expenses.find((e) => e.kind === 'card')!.amount).toBe(500);
+    expect(d.incomes.map((i) => i.name)).toEqual(['Salário']); // pontual só em julho
   });
 });

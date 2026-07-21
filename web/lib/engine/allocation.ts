@@ -197,6 +197,32 @@ export function planGoals(
   return { statuses, monthly, alerts };
 }
 
+/**
+ * Posição projetada de cada meta ao FIM de `month`: posição inicial (patrimônio
+ * distribuído) + aportes simulados de todos os meses até `month` (inclusive), com
+ * teto no alvo. `monthly` deve estar em ordem cronológica (saída de `planGoals`).
+ * Retorna Map<goalId, posição>.
+ */
+export function goalPositionsAt(
+  goals: Goal[],
+  netWorth: number,
+  monthly: MonthAllocation[],
+  month: Month
+): Map<string, number> {
+  const targetById = new Map(goals.map((g) => [g.id, Number(g.target_amount)]));
+  const pos = new Map<string, number>(distributeNetWorth(goals, netWorth));
+  for (const m of monthly) {
+    if (m.month > month) break;
+    for (const pg of m.perGoal) {
+      const cap = targetById.get(pg.goalId) ?? Infinity;
+      pos.set(pg.goalId, r2(Math.min(cap, (pos.get(pg.goalId) ?? 0) + pg.amount)));
+    }
+  }
+  // garante entrada para toda meta (mesmo sem aporte/posição)
+  for (const g of goals) if (!pos.has(g.id)) pos.set(g.id, 0);
+  return pos;
+}
+
 export interface NetWorthPoint {
   month: Month;
   netWorth: number;

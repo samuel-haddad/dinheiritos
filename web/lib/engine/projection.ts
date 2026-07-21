@@ -90,6 +90,75 @@ export function project(input: ProjectionInput): MonthProjection[] {
   });
 }
 
+/** Tipo de lançamento no detalhamento mensal. */
+export type DetailKind = 'recurring' | 'one_off' | 'planned' | 'card';
+
+/** Um lançamento individual que compõe as receitas/despesas de um mês. */
+export interface DetailItem {
+  id: string;
+  name: string;
+  amount: number;
+  profileId: string;
+  kind: DetailKind;
+}
+
+export interface MonthDetail {
+  month: Month;
+  incomes: DetailItem[]; // recorrentes + pontuais
+  expenses: DetailItem[]; // recorrentes + parcelas de previsões + faturas
+}
+
+/** Insumos que o detalhamento usa (subconjunto de ProjectionInput, sem horizonte/patrimônio). */
+export type MonthDetailInput = Pick<
+  ProjectionInput,
+  'recurringIncomes' | 'oneOffIncomes' | 'recurringExpenses' | 'plannedExpenses' | 'creditCards' | 'cardBills'
+>;
+
+/**
+ * Detalha, item a item, os lançamentos previstos de um único mês — usando exatamente
+ * as mesmas regras de `project()`. A soma de `incomes`/`expenses` reproduz
+ * `totalIncome`/`totalExpenses` daquele mês. Função pura (sem I/O).
+ */
+export function monthDetail(input: MonthDetailInput, month: Month): MonthDetail {
+  const bills = new Map<string, number>();
+  for (const b of input.cardBills) {
+    bills.set(`${b.credit_card_id}|${b.month}`, Number(b.amount));
+  }
+
+  const incomes: DetailItem[] = [];
+  const expenses: DetailItem[] = [];
+
+  for (const i of input.recurringIncomes) {
+    if (i.active && inRange(month, i.start_month, i.end_month) && occurs(month, i.start_month, i.interval_months)) {
+      incomes.push({ id: i.id, name: i.name, amount: r2(Number(i.amount)), profileId: i.profile_id, kind: 'recurring' });
+    }
+  }
+  for (const i of input.oneOffIncomes) {
+    if (i.active && toMonth(i.expected_date) === month) {
+      incomes.push({ id: i.id, name: i.name, amount: r2(Number(i.amount)), profileId: i.profile_id, kind: 'one_off' });
+    }
+  }
+
+  for (const e of input.recurringExpenses) {
+    if (e.active && inRange(month, e.start_month, e.end_month) && occurs(month, e.start_month, e.interval_months)) {
+      expenses.push({ id: e.id, name: e.name, amount: r2(Number(e.amount)), profileId: e.profile_id, kind: 'recurring' });
+    }
+  }
+  for (const p of input.plannedExpenses) {
+    if (p.active && month >= p.start_month && month < p.end_month) {
+      expenses.push({ id: p.id, name: p.name, amount: r2(Number(p.installment_amount)), profileId: p.profile_id, kind: 'planned' });
+    }
+  }
+  for (const c of input.creditCards) {
+    if (!c.active) continue;
+    const real = bills.get(`${c.id}|${month}`);
+    const amount = real !== undefined ? real : Number(c.base_amount);
+    expenses.push({ id: c.id, name: c.name, amount: r2(amount), profileId: c.profile_id, kind: 'card' });
+  }
+
+  return { month, incomes, expenses };
+}
+
 /** Horizonte padrão do app. */
 export const DEFAULT_HORIZON = 24;
 

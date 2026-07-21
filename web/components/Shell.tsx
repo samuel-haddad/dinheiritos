@@ -17,6 +17,17 @@ const LINKS = [
     ),
   },
   {
+    href: '/resumo/',
+    label: 'Resumo mensal',
+    subtitle: 'Lançamentos, aportes, consolidados e posição das metas de um mês.',
+    icon: (
+      <>
+        <rect x="3.5" y="4" width="13" height="13" rx="2" strokeWidth="1.5" />
+        <path d="M3.5 8h13M7 3v3M13 3v3" strokeWidth="1.5" strokeLinecap="round" />
+      </>
+    ),
+  },
+  {
     href: '/analises/',
     label: 'Análises',
     subtitle: 'Receita, despesa, composição e acumulados do período projetado.',

@@ -9,6 +9,7 @@ import ThemeToggle from './ThemeToggle';
 
 const links = [
   { href: '/', label: 'Projeção' },
+  { href: '/resumo/', label: 'Resumo mensal' },
   { href: '/analises/', label: 'Análises' },
   { href: '/lancamentos/', label: 'Lançamentos' },
   { href: '/contas/', label: 'Contas' },
