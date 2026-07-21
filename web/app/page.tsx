@@ -66,10 +66,12 @@ function Dashboard() {
   }, [data]);
 
   if (error) return <p style={{ color: 'var(--neg)' }}>Erro ao carregar dados: {error}</p>;
-  if (!view) return <p style={{ color: 'var(--muted)' }}>Carregando projeção…</p>;
+  if (!view || !data) return <p style={{ color: 'var(--muted)' }}>Carregando projeção…</p>;
 
   const cur = view.projections[0];
   const curWealth = view.wealth[0];
+  const next = view.projections[1];
+  const nextWealth = view.wealth[1];
   const wealthByMonth = new Map(view.wealth.map((w) => [w.month, w.netWorth]));
   let accFree = 0;
   const chart = view.projections.map((p) => {
@@ -85,13 +87,21 @@ function Dashboard() {
 
   return (
     <>
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Kpi title={`Receitas (${formatMonth(cur.month)})`} value={brl.format(cur.totalIncome)} g="receitas" />
+      <MonthSection label="Mês atual" month={cur.month}>
+        <Kpi title="Receitas" value={brl.format(cur.totalIncome)} g="receitas" />
         <Kpi title="Despesas" value={brl.format(cur.totalExpenses)} g="despesas" />
         <Kpi title="Saldo livre" value={brl.format(cur.freeBalance)} g="saldo-livre"
           tone={cur.freeBalance >= 0 ? 'good' : 'bad'} />
         <Kpi title="Patrimônio projetado" value={brl.format(curWealth.netWorth)} g="patrimonio" tone="accent" />
-      </div>
+      </MonthSection>
+
+      <MonthSection label="Próximo mês" month={next.month} soft badge="projeção">
+        <Kpi title="Receitas" value={brl.format(next.totalIncome)} g="receitas" soft />
+        <Kpi title="Despesas" value={brl.format(next.totalExpenses)} g="despesas" soft />
+        <Kpi title="Saldo livre" value={brl.format(next.freeBalance)} g="saldo-livre"
+          tone={next.freeBalance >= 0 ? 'good' : 'bad'} soft />
+        <Kpi title="Patrimônio projetado" value={brl.format(nextWealth.netWorth)} g="patrimonio" tone="accent" soft />
+      </MonthSection>
 
       {view.plan.alerts.length > 0 && (
         <div className="mb-4 space-y-1">
@@ -179,21 +189,65 @@ function Dashboard() {
   );
 }
 
-function Kpi({ title, value, tone, g }: { title: string; value: string; tone?: 'good' | 'bad' | 'accent'; g?: string }) {
-  const color =
+function MonthSection({
+  label, month, children, soft, badge,
+}: { label: string; month: string; children: React.ReactNode; soft?: boolean; badge?: string }) {
+  return (
+    <div className="mb-6" style={soft ? { opacity: 0.88 } : undefined}>
+      <div className="mb-3 flex items-baseline gap-2">
+        <h2
+          className="font-display m-0 font-semibold"
+          style={{ color: soft ? 'var(--muted)' : 'var(--ink)', fontSize: soft ? 13 : 15 }}
+        >
+          {label}
+        </h2>
+        <span className="text-[12.5px]" style={{ color: 'var(--muted)' }}>{formatMonth(month)}</span>
+        {badge && (
+          <span
+            className="rounded-full border px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide"
+            style={{ borderColor: 'var(--line)', color: 'var(--muted)', borderStyle: 'dashed' }}
+          >
+            {badge}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">{children}</div>
+    </div>
+  );
+}
+
+function Kpi({
+  title, value, tone, g, soft,
+}: { title: string; value: string; tone?: 'good' | 'bad' | 'accent'; g?: string; soft?: boolean }) {
+  const solidColor =
     tone === 'good' ? 'var(--pos)'
     : tone === 'bad' ? 'var(--neg)'
     : tone === 'accent' ? 'var(--accent-strong)'
     : 'var(--ink)';
+  const color = soft && tone ? `color-mix(in srgb, ${solidColor} 55%, var(--muted))` : solidColor;
   return (
-    <div className="card min-w-0 !p-4 md:!p-5">
-      <p className="m-0 mb-2 truncate text-[12px] font-medium md:mb-2.5 md:text-[12.5px]" style={{ color: 'var(--muted)' }}>
+    <div
+      className={soft ? 'card min-w-0 !p-3' : 'card min-w-0 !p-4 md:!p-5'}
+      style={
+        soft
+          ? { background: 'var(--surface-2)', boxShadow: 'none', border: '1px dashed var(--line)' }
+          : undefined
+      }
+    >
+      <p
+        className={
+          soft
+            ? 'm-0 mb-1.5 truncate text-[11px] font-medium'
+            : 'm-0 mb-2 truncate text-[12px] font-medium md:mb-2.5 md:text-[12.5px]'
+        }
+        style={{ color: 'var(--muted)' }}
+      >
         {title}{' '}
         {g && <InfoTip g={g} />}
       </p>
       <p
         className="num font-display m-0 whitespace-nowrap font-bold tracking-tight"
-        style={{ color, fontSize: 'clamp(15px, 4.4vw, 26px)' }}
+        style={{ color, fontSize: soft ? 'clamp(12px, 2.9vw, 17px)' : 'clamp(15px, 4.4vw, 26px)' }}
       >
         {value}
       </p>

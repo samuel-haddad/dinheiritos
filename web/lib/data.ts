@@ -84,4 +84,16 @@ export function currentNetWorth(data: AppData): number {
   return Math.round(total * 100) / 100;
 }
 
+/** Total investido: último snapshot de cada investimento (sem contas). */
+export function currentInvestedTotal(data: AppData): number {
+  const latest = new Map<string, { month: string; balance: number }>();
+  for (const s of data.investmentSnapshots) {
+    const k = s.investment_id;
+    if (!latest.has(k) || s.month > latest.get(k)!.month) latest.set(k, s);
+  }
+  let total = 0;
+  latest.forEach((v) => (total += Number(v.balance)));
+  return Math.round(total * 100) / 100;
+}
+
 export const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });

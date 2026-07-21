@@ -21,6 +21,28 @@ O Dinheiritos é alimentado conversando com Claude (Cowork ou Claude Code) conec
 6. **Confirmar antes de deletar** qualquer registro.
 7. Após fechamento de mês, recalcular `monthly_projections` do mês fechado (`is_closed = true`).
 
+## 2.1 Quando medir os snapshots (posição de contas/investimentos)
+
+**Regra: extrair as posições sempre entre o dia 24 e o fim do mês, e sempre no mesmo dia.**
+
+O motor usa o snapshot como âncora `net_worth(M−1)` e projeta o mês seguinte descontando um mês inteiro de faturas e despesas (`docs/PROJECTION_ENGINE.md` §1). Se a posição for medida **antes** de as faturas do ciclo saírem da conta, o mesmo dinheiro é contado como patrimônio no snapshot **e** subtraído de novo na projeção — dupla penalização, que deprime o patrimônio projetado e os aportes sugeridos às metas.
+
+Calendário de caixa (datado, das tabelas ativas):
+
+| Dia | Evento |
+|---|---|
+| 1 | Entram salário + alimentação Samuel |
+| 10 | Vencem faturas Elo e AA-Santander |
+| 13 | Vence fatura BTG |
+| 20 | Entra salário Ivana |
+| 21 | Vencem faturas Unq-Santander e Revolut |
+| 23 | Vence fatura Azul-Itaú (última do ciclo) |
+| 24→fim | Ciclo encerrado: toda renda entrou e todas as 6 faturas saíram |
+
+A partir do dia 24 o saldo observado é o **resíduo real do mês** — exatamente o que deve ser carregado adiante. Não medir no começo do mês (dias 1–9: salário do dia 1 na conta, nenhuma fatura paga → inflação máxima) nem no meio (dias 10–23: janela de faturas em aberto, ciclo parcial). Não passar do dia 1 seguinte, senão o novo salário do Samuel mistura dois ciclos. Manter **o mesmo dia todo mês**, pois o valor exibido vem da variação entre snapshots.
+
+> Ressalva: as `recurring_expenses` (incl. Financiamento Caixa) não têm dia de débito cadastrado; se alguma debitar no início do mês seguinte, revisar. Os débitos datados que mais distorcem o saldo são os cartões (último no dia 23).
+
 ## 3. Migração dos dados legados
 
 Fonte: `data/legacy/old_data.xlsx`. Mapeamento aba → tabela:
