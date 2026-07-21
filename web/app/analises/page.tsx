@@ -6,6 +6,7 @@ import {
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import AuthGate from '@/components/AuthGate';
+import RotatedTick from '@/components/ChartAxisTick';
 import InfoTip from '@/components/InfoTip';
 import Shell from '@/components/Shell';
 import Tabs from '@/components/Tabs';
@@ -33,8 +34,8 @@ const tooltipStyle = {
 const axis = { fontSize: 11, fill: 'var(--muted)' } as const;
 const kfmt = (v: number) => `${Math.round(v / 1000)}k`;
 const GOAL_COLORS = [
-  'var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)',
-  '#8A9A5B', '#B08968', '#6B8F71', '#A66E4E', '#4C7A73', '#C97B63',
+  '#12876F', '#E0A43B', '#C0553C', '#3B6FA0', '#8E5FB0',
+  '#6B8F3E', '#C05C8A', '#8B5E3C', '#4A4E69', '#D1495B',
 ];
 
 function Analises() {
@@ -104,12 +105,14 @@ function Analises() {
     let accAporte = 0;
     let accPrevisoes = 0;
     let accDespesas = 0;
+    let accReceitas = 0;
     const chart = proj.map((p) => {
       const pg = perGoalByMonth.get(p.month) ?? {};
       const aportes = allocByMonth.get(p.month) ?? 0;
       accAporte += aportes;
       accPrevisoes += p.plannedInstallments;
       accDespesas += p.totalExpenses;
+      accReceitas += p.totalIncome;
       const recorrentes = p.totalExpenses - p.cardExpenses - p.plannedInstallments;
       const goalCols: Record<string, number> = {};
       for (const nm of goalNames) goalCols[nm] = Math.round((pg[nm] ?? 0) * 100) / 100;
@@ -124,6 +127,7 @@ function Analises() {
         'Aportes acumulados': Math.round(accAporte * 100) / 100,
         'Previsões acumuladas': Math.round(accPrevisoes * 100) / 100,
         'Despesas acumuladas': Math.round(accDespesas * 100) / 100,
+        'Receitas acumuladas': Math.round(accReceitas * 100) / 100,
         ...goalCols,
       };
     });
@@ -167,9 +171,9 @@ function Analises() {
       <div className="card">
         {tab === 'Receita × Despesa' && (
           <ResponsiveContainer width="100%" height={340}>
-            <BarChart data={view.chart} margin={{ left: 12 }}>
+            <BarChart data={view.chart} margin={{ left: 12, bottom: 24 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-              <XAxis dataKey="label" tick={axis} interval={1} />
+              <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
               <YAxis tick={axis} tickFormatter={kfmt} />
               <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
               <Legend />
@@ -181,9 +185,9 @@ function Analises() {
 
         {tab === 'Composição das despesas' && (
           <ResponsiveContainer width="100%" height={340}>
-            <BarChart data={view.chart} margin={{ left: 12 }}>
+            <BarChart data={view.chart} margin={{ left: 12, bottom: 24 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-              <XAxis dataKey="label" tick={axis} interval={1} />
+              <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
               <YAxis tick={axis} tickFormatter={kfmt} />
               <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
               <Legend />
@@ -205,9 +209,9 @@ function Analises() {
                 Clique numa meta (barra ou legenda) para destacá-la; clique de novo para limpar.
               </p>
               <ResponsiveContainer width="100%" height={340}>
-                <BarChart data={view.chart} margin={{ left: 12 }}>
+                <BarChart data={view.chart} margin={{ left: 12, bottom: 24 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-                  <XAxis dataKey="label" tick={axis} interval={1} />
+                  <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
                   <YAxis tick={axis} tickFormatter={kfmt} />
                   <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
                   <Legend
@@ -233,19 +237,43 @@ function Analises() {
           ))}
 
         {tab === 'Acumulados' && (
-          <ResponsiveContainer width="100%" height={340}>
-            <AreaChart data={view.chart} margin={{ left: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-              <XAxis dataKey="label" tick={axis} interval={1} />
-              <YAxis tick={axis} tickFormatter={kfmt} />
-              <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
-              <Legend />
-              <ReferenceLine y={0} stroke="var(--line)" />
-              <Area dataKey="Despesas acumuladas" stroke="var(--chart-4)" fill="var(--chart-4)" fillOpacity={0.12} />
-              <Area dataKey="Previsões acumuladas" stroke="var(--chart-3)" fill="var(--chart-3)" fillOpacity={0.15} />
-              <Area dataKey="Aportes acumulados" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.15} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="flex flex-col gap-8">
+            <div>
+              <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                Receitas e despesas acumuladas
+              </p>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={view.chart} margin={{ left: 12, bottom: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
+                  <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
+                  <YAxis tick={axis} tickFormatter={kfmt} />
+                  <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
+                  <Legend />
+                  <ReferenceLine y={0} stroke="var(--line)" />
+                  <Area dataKey="Receitas acumuladas" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.15} />
+                  <Area dataKey="Despesas acumuladas" stroke="var(--chart-4)" fill="var(--chart-4)" fillOpacity={0.15} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                Previsões e aportes acumulados
+              </p>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={view.chart} margin={{ left: 12, bottom: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
+                  <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
+                  <YAxis tick={axis} tickFormatter={kfmt} />
+                  <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
+                  <Legend />
+                  <ReferenceLine y={0} stroke="var(--line)" />
+                  <Area dataKey="Previsões acumuladas" stroke="var(--chart-3)" fill="var(--chart-3)" fillOpacity={0.15} />
+                  <Area dataKey="Aportes acumulados" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.15} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         )}
 
         {tab === 'Tabela saldo' && (

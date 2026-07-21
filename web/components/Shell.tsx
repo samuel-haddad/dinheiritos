@@ -189,10 +189,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
-        <header className="flex max-w-[1100px] items-start gap-3 px-5 pb-2 pt-[20px] md:gap-5 md:px-10 md:pt-[34px]">
+        <header className="flex max-w-[1100px] flex-wrap items-center gap-3 px-5 pb-2 pt-[20px] md:flex-nowrap md:items-start md:gap-5 md:px-10 md:pt-[34px]">
           <button
             onClick={() => setMenuOpen(true)}
-            className="mt-1 flex-none rounded-lg p-1.5 md:hidden"
+            className="flex-none rounded-lg p-1.5 md:hidden"
             style={{ color: 'var(--ink)' }}
             aria-label="Abrir menu"
           >
@@ -201,15 +201,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             </svg>
           </button>
 
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[140px] flex-1">
             <h1 className="font-display m-0 text-[24px] font-bold tracking-tight md:text-[32px]" style={{ color: 'var(--ink)' }}>
               {current.label}
             </h1>
-            <p className="m-0 mt-1.5 max-w-[640px] text-[14.5px]" style={{ color: 'var(--muted)' }}>
+            <p className="m-0 mt-1.5 hidden text-[14.5px] md:block md:max-w-[640px]" style={{ color: 'var(--muted)' }}>
               {current.subtitle}
             </p>
           </div>
-          <div className="mt-1 flex flex-none items-center gap-2">
+
+          <div className="flex flex-none items-center gap-2 md:mt-1">
             <ThemeToggle />
             <button
               onClick={() => supabase().auth.signOut()}
@@ -219,6 +220,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               Sair
             </button>
           </div>
+
+          <p className="m-0 w-full text-[14.5px] md:hidden" style={{ color: 'var(--muted)' }}>
+            {current.subtitle}
+          </p>
         </header>
 
         <div className="max-w-[1100px] px-5 pb-[90px] pt-6 md:px-10">{children}</div>

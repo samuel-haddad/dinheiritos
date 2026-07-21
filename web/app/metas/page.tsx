@@ -6,6 +6,7 @@ import {
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import AuthGate from '@/components/AuthGate';
+import RotatedTick from '@/components/ChartAxisTick';
 import HealthChip from '@/components/HealthChip';
 import Shell from '@/components/Shell';
 import { AppData, brl, currentNetWorth, loadAppData } from '@/lib/data';
@@ -24,8 +25,8 @@ const CATEGORY_HELP: Record<GoalCategory, string> = {
 const axis = { fontSize: 11, fill: 'var(--muted)' } as const;
 const kfmt = (v: number) => `${Math.round(v / 1000)}k`;
 const GOAL_COLORS = [
-  'var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)',
-  '#8A9A5B', '#B08968', '#6B8F71', '#A66E4E', '#4C7A73', '#C97B63',
+  '#12876F', '#E0A43B', '#C0553C', '#3B6FA0', '#8E5FB0',
+  '#6B8F3E', '#C05C8A', '#8B5E3C', '#4A4E69', '#D1495B',
 ];
 const tooltipStyle = {
   background: 'var(--tooltip-bg)',
@@ -241,9 +242,9 @@ function GoalDetail({
           </p>
           <div style={{ color: 'var(--ink)' }}>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={series} margin={{ left: 12 }}>
+              <BarChart data={series} margin={{ left: 12, bottom: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-                <XAxis dataKey="label" tick={axis} interval={tickEvery} />
+                <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={tickEvery} height={50} />
                 <YAxis tick={axis} tickFormatter={kfmt} />
                 <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
                 <Legend />
@@ -528,18 +529,12 @@ function Goals() {
 
   return (
     <>
-      <div className="mb-5 flex items-start gap-4">
-        <p className="m-0 max-w-[540px] text-[13.5px]" style={{ color: 'var(--muted)' }}>
+      <div className="mb-5">
+        <p className="m-0 max-w-[720px] text-[13.5px]" style={{ color: 'var(--muted)' }}>
           A posição de cada meta vem do patrimônio (contas + investimentos), distribuído por prazo
           mais próximo, com teto no alvo — o excedente cascateia para as demais. A ordem abaixo só
           desempata quando o saldo livre do mês não cobre todos os aportes mínimos.
         </p>
-        <button className="btn-primary ml-auto shrink-0" onClick={() => setEditing(blank)}>
-          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-            <path d="M10 4v12M4 10h12" strokeWidth="1.9" strokeLinecap="round" />
-          </svg>
-          Nova meta
-        </button>
       </div>
 
       {view.plan.alerts.length > 0 && (
@@ -567,9 +562,9 @@ function Goals() {
           </p>
           <div style={{ color: 'var(--ink)' }}>
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={view.evolution} margin={{ left: 12 }}>
+              <LineChart data={view.evolution} margin={{ left: 12, bottom: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-                <XAxis dataKey="label" tick={axis} interval={1} />
+                <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
                 <YAxis tick={axis} tickFormatter={kfmt} />
                 <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
                 <Legend />
@@ -589,6 +584,15 @@ function Goals() {
           </div>
         </section>
       )}
+
+      <div className="mb-5 flex justify-end">
+        <button className="btn-primary shrink-0" onClick={() => setEditing(blank)}>
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+            <path d="M10 4v12M4 10h12" strokeWidth="1.9" strokeLinecap="round" />
+          </svg>
+          Nova meta
+        </button>
+      </div>
 
       {view.ordered.length > 0 && (
         <div className="mb-3.5 flex flex-wrap items-center gap-3">

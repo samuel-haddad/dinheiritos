@@ -99,9 +99,9 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     id: 'evolucao-investimentos',
-    term: 'Evolução dos investimentos',
+    term: 'Evolução das posições',
     formula: 'Σ posições mensais lançadas, total e por pessoa',
-    desc: 'Construída a partir dos snapshots de investimento. Quanto mais fechamentos mensais registrados, mais longa a série.',
+    desc: 'Construída a partir dos snapshots de investimento. Quanto mais fechamentos mensais registrados, mais longa a série. O gráfico só aparece a partir de dois meses de posições lançadas — continue registrando os fechamentos mensais para vê-lo crescer.',
   },
   {
     id: 'mes-fechado',

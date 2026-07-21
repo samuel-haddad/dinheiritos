@@ -9,6 +9,7 @@ import Link from 'next/link';
 import AuthGate from '@/components/AuthGate';
 import HealthChip from '@/components/HealthChip';
 import InfoTip from '@/components/InfoTip';
+import RotatedTick from '@/components/ChartAxisTick';
 import Shell from '@/components/Shell';
 import { AppData, brl, currentNetWorth, loadAppData } from '@/lib/data';
 import { planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
@@ -108,21 +109,21 @@ function Dashboard() {
 
       <Card title="Saldo livre projetado · próximos 24 meses" g="saldo-livre">
         <div style={{ color: 'var(--ink)' }}>
-          <ResponsiveContainer width="100%" height={280}>
-            <ComposedChart data={chart} margin={{ left: 12, right: 12 }}>
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={chart} margin={{ left: 12, right: 12, bottom: 24 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-              <XAxis dataKey="label" tick={axis} interval={1} />
+              <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
               <YAxis yAxisId="mes" tick={axis} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
               <YAxis yAxisId="acc" orientation="right" tick={axis} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
               <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: 12.5 }} />
               <ReferenceLine yAxisId="mes" y={0} stroke="var(--line)" />
               <Bar yAxisId="mes" dataKey="freeBalance" name="Saldo livre (mês)" radius={[4, 4, 0, 0]}>
                 {chart.map((p) => (
                   <Cell key={p.month} fill={p.freeBalance >= 0 ? 'var(--chart-2)' : 'var(--neg)'} />
                 ))}
               </Bar>
-              <Line yAxisId="acc" type="monotone" dataKey="saldoAcumulado" name="Saldo livre acumulado" stroke="var(--accent-strong)" strokeWidth={2.5} dot={false} />
+              <Line yAxisId="acc" type="monotone" dataKey="saldoAcumulado" name="Saldo livre acumulado" stroke="var(--chart-3)" strokeWidth={2.75} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -130,10 +131,10 @@ function Dashboard() {
 
       <Card title="Patrimônio projetado" g="patrimonio">
         <div style={{ color: 'var(--ink)' }}>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={chart} margin={{ left: 12 }}>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={chart} margin={{ left: 12, bottom: 24 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-              <XAxis dataKey="label" tick={axis} interval={1} />
+              <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
               <YAxis tick={axis} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
               <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
               <Line type="monotone" dataKey="netWorth" name="Patrimônio" stroke="var(--chart-1)" strokeWidth={2.5} dot={false} />
@@ -146,19 +147,25 @@ function Dashboard() {
         {active.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Nenhuma meta ativa.</p>
         ) : (
-          <ul>
+          <ul className="flex flex-col gap-2">
             {active.map((s) => (
               <li
                 key={s.goal.id}
-                className="flex items-center gap-3.5 border-b py-3 text-sm last:border-0"
-                style={{ borderColor: 'var(--line)' }}
+                className="flex flex-col gap-2 rounded-xl px-3.5 py-3 text-sm sm:flex-row sm:items-center sm:gap-3.5"
+                style={{ background: 'var(--surface-2)' }}
               >
-                <HealthChip health={s.health} />
-                <span className="font-medium" style={{ color: 'var(--ink)' }}>{s.goal.name}</span>
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>mín. {brl.format(s.requiredMonthly)}/mês</span>
-                <span className="num font-display ml-auto font-bold" style={{ color: 'var(--accent-strong)' }}>
-                  {brl.format(s.suggestedThisMonth)}
-                </span>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <HealthChip health={s.health} />
+                  <span className="min-w-0 truncate font-medium" style={{ color: 'var(--ink)' }}>{s.goal.name}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 sm:ml-auto sm:justify-end">
+                  <span className="whitespace-nowrap text-xs" style={{ color: 'var(--muted)' }}>
+                    mín. {brl.format(s.requiredMonthly)}/mês
+                  </span>
+                  <span className="num font-display whitespace-nowrap font-bold" style={{ color: 'var(--accent-strong)' }}>
+                    {brl.format(s.suggestedThisMonth)}
+                  </span>
+                </div>
               </li>
             ))}
           </ul>
@@ -179,12 +186,17 @@ function Kpi({ title, value, tone, g }: { title: string; value: string; tone?: '
     : tone === 'accent' ? 'var(--accent-strong)'
     : 'var(--ink)';
   return (
-    <div className="card !p-5">
-      <p className="m-0 mb-2.5 text-[12.5px] font-medium" style={{ color: 'var(--muted)' }}>
+    <div className="card min-w-0 !p-4 md:!p-5">
+      <p className="m-0 mb-2 truncate text-[12px] font-medium md:mb-2.5 md:text-[12.5px]" style={{ color: 'var(--muted)' }}>
         {title}{' '}
         {g && <InfoTip g={g} />}
       </p>
-      <p className="num font-display m-0 text-[26px] font-bold tracking-tight" style={{ color }}>{value}</p>
+      <p
+        className="num font-display m-0 whitespace-nowrap font-bold tracking-tight"
+        style={{ color, fontSize: 'clamp(15px, 4.4vw, 26px)' }}
+      >
+        {value}
+      </p>
     </div>
   );
 }

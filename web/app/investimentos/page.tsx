@@ -5,7 +5,9 @@ import {
   CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
 } from 'recharts';
 import AuthGate from '@/components/AuthGate';
+import RotatedTick from '@/components/ChartAxisTick';
 import EntityManager, { EntityConfig, Option } from '@/components/EntityManager';
+import InfoTip from '@/components/InfoTip';
 import Shell from '@/components/Shell';
 import Tabs from '@/components/Tabs';
 import { brl } from '@/lib/format';
@@ -162,19 +164,19 @@ function Investimentos() {
 
       <section className="card mb-5">
         <h2 className="font-display mb-3.5 text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
-          Evolução das posições
+          Evolução das posições{' '}
+          <InfoTip g="evolucao-investimentos" className="font-normal" />
         </h2>
         {evolution.length < 2 ? (
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            O gráfico aparece a partir de dois meses de posições lançadas — continue registrando os
-            fechamentos mensais.
+            Ainda não há dados suficientes para o gráfico.
           </p>
         ) : (
           <div style={{ color: 'var(--ink)' }}>
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={evolution} margin={{ left: 12 }}>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={evolution} margin={{ left: 12, bottom: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-                <XAxis dataKey="label" tick={axis} />
+                <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
                 <YAxis tick={axis} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                 <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
                 <Legend />
