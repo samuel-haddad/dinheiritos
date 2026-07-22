@@ -19,6 +19,7 @@ function GoogleIcon() {
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [approved, setApproved] = useState<boolean | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +34,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase().auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setApproved(null);
+      return;
+    }
+    let cancelled = false;
+    setApproved(null);
+    supabase()
+      .rpc('is_approved_user')
+      .then(({ data, error: rpcError }) => {
+        if (cancelled) return;
+        setApproved(rpcError ? false : Boolean(data));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  async function signOut() {
+    await supabase().auth.signOut();
+  }
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
@@ -85,6 +108,36 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             {error && <p className="text-sm" style={{ color: 'var(--neg)' }}>{error}</p>}
             <button type="submit" className="btn-primary w-full justify-center">Entrar</button>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (approved !== true) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
+        <div className="card w-full max-w-sm space-y-4 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={asset('/logo.png')} alt="Dinheiritos" className="mx-auto w-40" />
+          {approved === null ? (
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>Verificando acesso…</p>
+          ) : (
+            <>
+              <p className="text-sm" style={{ color: 'var(--ink)' }}>
+                Sua conta ({session.user.email}) ainda não tem acesso liberado ao Dinheiritos.
+              </p>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                Peça para o Samuel aprovar seu login.
+              </p>
+              <button
+                onClick={signOut}
+                className="w-full rounded-full border py-2.5 text-sm font-semibold transition-colors"
+                style={{ borderColor: 'var(--line)', background: 'var(--surface)', color: 'var(--ink)' }}
+              >
+                Sair
+              </button>
+            </>
+          )}
         </div>
       </div>
     );

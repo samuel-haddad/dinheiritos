@@ -161,6 +161,20 @@ Campos calculados (posição atual, faltante, aporte mínimo, status/alcance) **
 
 `category` **não** muda a alocação/aporte (§2 continua igual para as duas categorias) — só é usada no cálculo do Patrimônio Projetado ajustado (`docs/PROJECTION_ENGINE.md` §1): metas `gasto` não pausadas têm o valor já reservado a elas descontado do patrimônio bruto, mês a mês, porque esse valor está comprometido com um gasto futuro e não é patrimônio disponível.
 
+## Acesso
+
+### `approved_users` — allowlist de acesso (migration 0008)
+Login continua aberto (e-mail/senha ou Google); o acesso às tabelas de dados exige que o e-mail esteja aqui. Ver `ARCHITECTURE.md` §6 (D6).
+
+| coluna | tipo | notas |
+|---|---|---|
+| email | text | único, normalizado em minúsculas |
+| user_id | uuid FK auth.users | preenchido automaticamente (trigger) quando o e-mail aprovado faz login |
+| note | text | quem aprovou / por quê |
+| approved_at | timestamptz | |
+
+Sem policy de `select` — só é lida pela função `is_approved_user()` (security definer), chamada via RPC pelo `AuthGate`. Aprovar/revogar é feito por SQL direto (Supabase MCP/Studio), não pelo app.
+
 ## Configuração
 
 ### `app_settings` — preferências globais (migration 0007)
@@ -176,10 +190,10 @@ Linha única (singleton), compartilhada pelos perfis.
 (`docs/PROJECTION_ENGINE.md` §2). Afeta o app inteiro; é passado ao motor de alocação como
 `mode`. Gravado por upsert em `id = true` (`setAllocationMode`, `lib/data.ts`).
 
-## Projeção (cache)
+## Projeção (semente legada)
 
 ### `monthly_projections`
-*(planilha: `saldo`)* Guarda **apenas meses fechados** (histórico). Meses futuros **nunca** são cacheados — o motor recalcula no cliente a cada carga. Meses legados anteriores a 2026-07 não são reconstituíveis pelos insumos atuais (as recorrentes começam em 2026-07); são registro histórico. O `goal_allocation` dos meses fechados foi zerado no saneamento (5.0) — não há aportes reconstruíveis.
+*(planilha: `saldo`)* **Não é mais escrita.** O histórico de meses fechados é **derivado on-the-fly** (`web/lib/history.ts`, `deriveHistory`) — não há evento de "fechar mês" (ver `docs/PROJECTION_ENGINE.md` §3). A tabela sobrevive apenas como **semente estática dos meses legados** anteriores à primeira recorrente (2026-07), que não são reconstituíveis pelos insumos atuais. Meses ≥ 2026-07 e futuros são reconstituídos pelo motor a cada carga. O `goal_allocation` dos meses fechados foi zerado no saneamento (5.0) — não há aportes reconstruíveis.
 
 | coluna | tipo | notas |
 |---|---|---|

@@ -113,20 +113,28 @@ no horizonte), `paused`, `achieved`.
 
 A simulação usa alocações sugeridas apenas para meses futuros; não há aportes manuais persistidos.
 
-## 3. Fechamento de mês
+## 3. Histórico de meses fechados (não há evento de "fechar mês")
 
-Ao virar o mês (ação manual ou via agente):
+Não existe um evento de fechamento a disparar. Tudo que é **atual ou futuro** já é
+recalculado no cliente a cada carga a partir das fontes; e o **"real" dos meses
+vencidos** é **derivado on-the-fly**, não cacheado (`web/lib/history.ts`, `deriveHistory`):
 
-1. Registrar snapshots de contas e investimentos (`account_snapshots`, `investment_snapshots`).
-2. Registrar faturas fechadas em `card_bills`.
-3. Confirmar `one_off_incomes` e parcelas ocorridas.
-4. Recalcular e gravar `monthly_projections` com `is_closed = true`.
+- **Meses ∈ [primeira recorrente, mês atual)** — reconstruídos pelo próprio motor
+  (`project()`) somado ao **patrimônio observado** dos snapshots (`netWorthAt`: último
+  snapshot com `month ≤ M` de cada conta/investimento). A fatura entra real quando existe
+  em `card_bills`; senão o `base_amount`. `free_balance = receita − despesa` (estimativa);
+  `net_worth` é o real observado. A reconstrução é fiel porque mudanças em recorrentes
+  preservam histórico (encerrar vigente + criar novo), então `inRange` usa as datas de época.
+- **Meses legados anteriores** (não reconstituíveis: as recorrentes começam em 2026-07) —
+  vêm de `monthly_projections` como **semente estática**.
 
-(A posição das metas vem dos snapshots do passo 1 — não há aportes a registrar.)
+O único trabalho recorrente é **manter snapshots e faturas em dia** — a ingestão que
+aconteceria de qualquer forma (`docs/DATA_INGESTION.md`). A posição das metas vem desses
+snapshots; aportes de meses fechados não são reconstituíveis (não são persistidos) → 0.
 
 ## 4. Invariantes
 
-- O motor nunca grava no banco; quem persiste é a camada de fechamento.
-- `monthly_projections` guarda só meses fechados (histórico); os futuros nunca são cacheados — o motor os reconstitui no cliente. (Meses legados anteriores a 2026-07 não são recomputáveis pelos insumos atuais.)
+- O motor nunca grava no banco; é função pura sobre os dados carregados.
+- `monthly_projections` **não é mais escrita**: serve só de semente para os meses legados (< primeira recorrente, hoje 2026-07 — não recomputáveis pelos insumos atuais). Os meses fechados reconstituíveis e os futuros são derivados no cliente a cada carga (`deriveHistory` + `project`).
 - Valores monetários em `numeric`; nada de float no banco.
 - Horizonte padrão: mês atual + 24 meses.

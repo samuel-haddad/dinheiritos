@@ -8,7 +8,7 @@
 
 ## Fase 1 — Dados ✅
 - [x] Migração dos dados legados (16/07/2026, validada contra a aba `saldo`)
-- [ ] Rotina de fechamento de mês via agente (snapshots + faturas)
+- [x] **Fechamento de mês — resolvido sem evento.** Investigação mostrou que o app já recalcula tudo (atual/futuro) ao vivo a cada carga, e o "real" dos meses vencidos passou a ser **derivado on-the-fly** (`web/lib/history.ts`, `deriveHistory` + 3 testes) em vez de cacheado. Não há ritual de "fechar mês": basta a ingestão de `account_snapshots`/`card_bills`/`investment_snapshots` via agente (prints/texto → Supabase MCP). `monthly_projections` virou só semente legada (< 2026-07). Docs atualizados (`PROJECTION_ENGINE.md` §3/§4, `DATA_MODEL.md`, `DATA_INGESTION.md`).
 
 ## Fase 2 — Web app (MVP)
 - [x] Scaffold Next.js em `web/` (export estático, Supabase Auth)
@@ -26,7 +26,8 @@
 - [x] Análises: Receita × Despesa, composição de despesas, aportes, acumulados, tabela saldo (real vs projetado)
 - [x] Evolução dos investimentos (total e por pessoa)
 - [ ] Métricas de previsto vs realizado, acurácia, taxa de poupança, runway
-- [ ] Fluxo "Fechar mês" guiado (um clique para lançar tudo do mês)
+  - **Nota:** o "realizado" já é derivável (patrimônio observado dos snapshots; `deriveHistory`). O "previsto" **não** é reconstituível depois — é o único dado perecível: exige persistir um *snapshot de previsão* do mês no começo dele (candidato a tarefa agendada/agente). Só essa métrica justifica uma escrita nova.
+- [ ] ~~Fluxo "Fechar mês" guiado (um clique)~~ — **superado** pela derivação on-the-fly (Fase 1): não há mês a "fechar". O que resta é opcional: uma tela de conferência que mostre o que falta de snapshot/fatura no mês vencido.
 - [x] Redesign visual no Claude Design (backlog)
 
 ## Fase 4 — IA Financial Advisor

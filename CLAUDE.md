@@ -21,7 +21,7 @@ Dinheiritos: web app de **planejamento e projeção financeira** (não é contro
 
 ## Ingestão de dados (Supabase MCP)
 
-Ao inserir/atualizar dados a pedido do Samuel ou da Ivana, siga `docs/DATA_INGESTION.md`. Resumo:
+Ao inserir/atualizar dados a pedido do Samuel ou da Ivana, siga `docs/DATA_INGESTION.md`. Para ingestão por **print/texto/tabela** (saldos e faturas → upsert), use o runbook `docs/INGESTION_AGENT.md`, que traz o mapa de entidades (ids + apelidos) e os templates de upsert. Resumo:
 
 - Upsert em snapshots (únicos por entidade+mês), nunca duplicar.
 - Mudança de renda/despesa recorrente: encerrar registro vigente e criar novo — preservar histórico.

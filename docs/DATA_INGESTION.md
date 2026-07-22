@@ -2,11 +2,13 @@
 
 O Dinheiritos é alimentado conversando com Claude (Cowork ou Claude Code) conectado ao **Supabase MCP**. O app não depende de digitação manual de formulários no dia a dia.
 
+> Para ingestão a partir de **print, texto ou tabela** (saldos e faturas), o runbook operacional é `docs/INGESTION_AGENT.md` — traz o mapa de entidades (ids + apelidos), as regras de mês e os templates de upsert prontos. Este documento aqui é a referência conceitual; o runbook é o passo a passo.
+
 ## 1. Fluxos de ingestão
 
 | Quando | Exemplo de pedido ao agente | Tabelas afetadas |
 |---|---|---|
-| Fechamento do mês | "Fecha junho: BTG 5.321,81; Caixa 9.200; fatura BTG 2.661,49..." | `account_snapshots`, `card_bills`, `investment_snapshots`, `monthly_projections` |
+| Atualizar o mês vencido | "Atualiza junho: BTG 5.321,81; Caixa 9.200; fatura BTG 2.661,49..." | `account_snapshots`, `card_bills`, `investment_snapshots` |
 | Nova previsão | "Vamos parcelar a obra do jardim: 10 mil em 3x a partir de outubro, no meu nome" | `planned_expenses` |
 | Mudança de renda | "O salário da Ivana subiu para 35 mil a partir de setembro" | `recurring_incomes` (encerra a vigente, cria nova) |
 | Nova meta | "Meta nova: trocar o carro, 250 mil até maio/2028" | `goals` (posição e alcance são calculados do patrimônio) |
@@ -19,7 +21,7 @@ O Dinheiritos é alimentado conversando com Claude (Cowork ou Claude Code) conec
 4. **Responsável**: todo registro tem `profile_id` (Samuel ou Ivana). Se ambíguo, perguntar.
 5. **Valores em BRL**, `numeric(14,2)`. Interpretar "5.321,81" como 5321.81.
 6. **Confirmar antes de deletar** qualquer registro.
-7. Após fechamento de mês, recalcular `monthly_projections` do mês fechado (`is_closed = true`).
+7. **Não existe evento de "fechar mês".** Basta manter `account_snapshots`, `card_bills` e `investment_snapshots` do mês vencido em dia — o histórico "real" é derivado on-the-fly no app (`web/lib/history.ts`; `docs/PROJECTION_ENGINE.md` §3). Não escreva em `monthly_projections` (só semente legada < 2026-07).
 
 ## 2.1 Quando medir os snapshots (posição de contas/investimentos)
 

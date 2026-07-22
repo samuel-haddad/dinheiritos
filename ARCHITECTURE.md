@@ -73,6 +73,9 @@ Detalhes completos em [docs/DATA_MODEL.md](docs/DATA_MODEL.md).
 ## 6. Autenticação e segurança
 
 - Supabase Auth com dois usuários (Samuel, Ivana), dados compartilhados.
-- RLS: todas as tabelas exigem `authenticated`; sem multi-tenancy nesta fase.
+- RLS: todas as tabelas exigem `authenticated` **e** aprovação prévia (ver D6); sem multi-tenancy nesta fase.
 - Anon key exposta no build estático é aceitável (RLS protege os dados).
 - Chave da Anthropic API só em secrets de Edge Function, nunca no cliente.
+
+### D6 — Acesso por aprovação (allowlist)
+Login (e-mail/senha ou Google) continua aberto — qualquer pessoa com o link pode autenticar, inclusive porque a anon key exposta permite chamar `auth.signUp` diretamente. O que passou a ser restrito é o **acesso aos dados**: a tabela `approved_users` (migration `0008_approved_users_access_gate.sql`) guarda uma allowlist por e-mail, e a função `is_approved_user()` (security definer) substitui o `using (true)` das policies RLS em todas as tabelas de dados. Uma conta autenticada mas não aprovada consegue logar, mas toda query retorna vazio/nega escrita — o `AuthGate` (`web/components/AuthGate.tsx`) chama `is_approved_user()` via RPC logo após o login e mostra uma tela de "aguardando aprovação" em vez do app. Aprovar alguém é inserir o e-mail em `approved_users` via SQL (Supabase MCP/Studio) — não há UI de aprovação no app.

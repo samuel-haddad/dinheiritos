@@ -11,6 +11,7 @@ import InfoTip from '@/components/InfoTip';
 import Shell from '@/components/Shell';
 import Tabs from '@/components/Tabs';
 import { AppData, currentNetWorth, loadAppData } from '@/lib/data';
+import { deriveHistory } from '@/lib/history';
 import { brl } from '@/lib/format';
 import { planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
 import { formatMonth } from '@/lib/engine/months';
@@ -133,18 +134,21 @@ function Analises() {
       };
     });
 
-    // Tabela: meses fechados (reais) + projeção dali em diante
-    const closed = data.monthlyProjections
-      .filter((m) => m.is_closed && m.month < startMonth)
-      .map((m) => ({
-        month: m.month,
-        receitas: Number(m.total_income),
-        despesas: Number(m.total_expenses),
-        saldo: Number(m.free_balance),
-        aportes: Number(m.goal_allocation),
-        patrimonio: Number(m.net_worth),
-        real: true,
-      }));
+    // Tabela: meses fechados (reais, derivados on-the-fly) + projeção dali em diante.
+    // Sem evento de "fechar mês": o histórico é reconstruído do motor + snapshots
+    // observados; monthly_projections só semeia meses legados (docs/PROJECTION_ENGINE.md §3).
+    const closed = deriveHistory({
+      startMonth,
+      recurringIncomes: data.recurringIncomes,
+      oneOffIncomes: data.oneOffIncomes,
+      recurringExpenses: data.recurringExpenses,
+      plannedExpenses: data.plannedExpenses,
+      creditCards: data.creditCards,
+      cardBills: data.cardBills,
+      accountSnapshots: data.accountSnapshots,
+      investmentSnapshots: data.investmentSnapshots,
+      legacy: data.monthlyProjections,
+    });
     const projected = proj.map((p) => ({
       month: p.month,
       receitas: p.totalIncome,
