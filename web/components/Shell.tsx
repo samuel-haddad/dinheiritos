@@ -178,24 +178,28 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="flex items-center gap-2.5 border-t pt-[18px]" style={{ borderColor: 'var(--line)' }}>
-          <div className="flex">
-            <span
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-full border-2 text-xs font-bold text-white"
-              style={{ background: 'var(--accent)', borderColor: 'var(--bg)' }}
-            >
-              {p1.charAt(0).toUpperCase()}
-            </span>
-            <span
-              className="-ml-[9px] flex h-[30px] w-[30px] items-center justify-center rounded-full border-2 text-xs font-bold text-white"
-              style={{ background: 'var(--chart-3)', borderColor: 'var(--bg)' }}
-            >
-              {p2.charAt(0).toUpperCase()}
+        <div className="flex flex-col gap-3 border-t pt-[18px]" style={{ borderColor: 'var(--line)' }}>
+          <ThemeToggle />
+
+          <div className="flex items-center gap-2.5">
+            <div className="flex">
+              <span
+                className="flex h-[30px] w-[30px] items-center justify-center rounded-full border-2 text-xs font-bold text-white"
+                style={{ background: 'var(--accent)', borderColor: 'var(--bg)' }}
+              >
+                {p1.charAt(0).toUpperCase()}
+              </span>
+              <span
+                className="-ml-[9px] flex h-[30px] w-[30px] items-center justify-center rounded-full border-2 text-xs font-bold text-white"
+                style={{ background: 'var(--chart-3)', borderColor: 'var(--bg)' }}
+              >
+                {p2.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <span className="text-[13px] font-medium" style={{ color: 'var(--muted)' }}>
+              {p1} &amp; {p2}
             </span>
           </div>
-          <span className="text-[13px] font-medium" style={{ color: 'var(--muted)' }}>
-            {p1} &amp; {p2}
-          </span>
         </div>
       </aside>
 
@@ -222,7 +226,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex flex-none items-center gap-2 md:mt-1">
-            <ThemeToggle />
             <button
               onClick={() => supabase().auth.signOut()}
               className="btn-secondary"
