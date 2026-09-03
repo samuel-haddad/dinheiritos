@@ -139,7 +139,51 @@ O único trabalho recorrente é **manter snapshots e faturas em dia** — a inge
 aconteceria de qualquer forma (`docs/DATA_INGESTION.md`). A posição das metas vem desses
 snapshots; aportes de meses fechados não são reconstituíveis (não são persistidos) → 0.
 
-## 4. Invariantes
+## 5. Fluxo de caixa diário (`dailyCashFlow`, `web/lib/engine/cashflow.ts`)
+
+Enquanto `project()` trabalha em granularidade **mensal**, o fluxo de caixa diário responde
+a uma pergunta diferente: **dentro do mês**, existe algum dia em que o saldo em **contas
+correntes** (não patrimônio, não investimentos) fica negativo — ou seja, seria necessário
+sacar de investimentos para cobrir as despesas daquele mês?
+
+**Dia do mês de cada lançamento** — levantamento (migration 0011):
+
+| Origem | Coluna | Situação |
+|---|---|---|
+| `recurring_incomes` | `receipt_day` | já existia (migration 0001) |
+| `one_off_incomes` | `expected_date` | já é `date` completa, tem o dia |
+| `credit_cards` (base e fatura real) | `due_day` | já existia (migration 0001); `card_bills` não tem dia próprio, usa o do cartão |
+| `recurring_expenses` | `payment_day` | adicionada na migration 0011 |
+| `planned_expenses` (parcelas) | `due_day` | adicionada na migration 0011 |
+
+Sem o dia preenchido, `dailyCashFlow` assume **dia 1** (mesma leitura que a visão mensal já
+dava a esses lançamentos, sem regressão). Um dia que não existe no mês (ex.: 31 em abril)
+cai no último dia do mês. As mesmas regras de vigência/periodicidade de `project()` (`occurs`,
+`inRange`) e a mesma supressão de previsão vinculada a cartão com fatura já lançada
+(`suppressedByCardBill`, §1) valem aqui — os dois motores reusam os mesmos helpers para não
+divergir.
+
+```
+saldo(dia 0) = saldo em contas no início do mês
+saldo(dia D) = saldo(dia D−1) + Σ receitas do dia D − Σ despesas do dia D
+
+minBalance   = menor saldo(dia D) do mês
+withdrawalNeeded = minBalance < 0
+withdrawalAmount = max(0, −minBalance)
+withdrawalDate   = primeiro dia em que saldo(dia D) < 0
+```
+
+**Saldo de partida do mês** — para o mês atual, o saldo real em contas (último snapshot de
+cada conta, sem investimentos — `currentAccountsBalance`, `lib/data.ts`). Para meses futuros,
+esse saldo real somado ao `freeBalance` projetado (`project()`) de cada mês entre o atual e o
+selecionado — assume que o saldo livre projetado permanece em contas até ser gasto (mesma
+simplificação que o resto do app já faz ao acumular `net_worth` a partir do `freeBalance`,
+sem modelar transferências para investimento).
+
+Consumida pela tela de Resumo Mensal (`web/app/resumo/page.tsx`), que sinaliza se haverá
+retirada de investimentos no mês selecionado, de qual valor e em qual data.
+
+## 6. Invariantes
 
 - O motor nunca grava no banco; é função pura sobre os dados carregados.
 - `monthly_projections` **não é mais escrita**: serve só de semente para os meses legados (< primeira recorrente, hoje 2026-07 — não recomputáveis pelos insumos atuais). Os meses fechados reconstituíveis e os futuros são derivados no cliente a cada carga (`deriveHistory` + `project`).

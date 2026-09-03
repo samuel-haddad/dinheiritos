@@ -96,6 +96,7 @@ function Lancamentos() {
         fields: [
           { key: 'name', label: 'Nome', type: 'text', required: true },
           { key: 'amount', label: 'Valor mensal (R$)', type: 'money', required: true },
+          { key: 'payment_day', label: 'Dia do pagamento', type: 'int', help: 'Usado no fluxo de caixa diário (Resumo Mensal). Sem preencher, assume dia 1.' },
           { key: 'profile_id', label: 'Responsável', type: 'select', options: profOpts, required: true },
           { key: 'start_month', label: 'Início da vigência', type: 'month', required: true },
           { key: 'end_month', label: 'Fim da vigência (vazio = sem prazo)', type: 'month' },
@@ -105,6 +106,7 @@ function Lancamentos() {
         columns: [
           { key: 'name', label: 'Despesa' },
           { key: 'amount', label: 'Valor', right: true, render: (r) => money(r.amount) },
+          { key: 'payment_day', label: 'Dia', render: (r) => r.payment_day ?? '—' },
           { key: 'profile_id', label: 'Responsável', render: owner },
           { key: 'start_month', label: 'Vigência', render: vigencia },
           periodicityColumn,
@@ -144,6 +146,7 @@ function Lancamentos() {
           { key: 'total_amount', label: 'Valor total (R$)', type: 'money', required: true },
           { key: 'installments', label: 'Parcelas', type: 'int', required: true, help: '1 = à vista' },
           { key: 'start_month', label: 'Primeira parcela', type: 'month', required: true },
+          { key: 'due_day', label: 'Dia de vencimento da parcela', type: 'int', help: 'Usado no fluxo de caixa diário (Resumo Mensal). Sem preencher, assume dia 1.' },
           { key: 'profile_id', label: 'Responsável', type: 'select', options: profOpts, required: true },
           { key: 'confirmed', label: 'Compromisso confirmado', type: 'checkbox' },
           { key: 'is_card_expense', label: 'Cartão', type: 'checkbox' },
@@ -170,6 +173,7 @@ function Lancamentos() {
             label: 'Período',
             render: (r) => `${monthCell(r.start_month)} → ${monthCell(addMonths(r.end_month, -1))}`,
           },
+          { key: 'due_day', label: 'Dia', render: (r) => r.due_day ?? '—' },
           { key: 'profile_id', label: 'Responsável', render: owner },
           {
             key: 'is_card_expense',

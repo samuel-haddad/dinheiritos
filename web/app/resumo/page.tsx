@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import {
+  Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
 import AuthGate from '@/components/AuthGate';
 import HealthChip from '@/components/HealthChip';
 import InfoTip from '@/components/InfoTip';
 import Shell from '@/components/Shell';
-import { AppData, currentNetWorth, loadAppData } from '@/lib/data';
+import { AppData, currentAccountsBalance, currentNetWorth, loadAppData } from '@/lib/data';
 import { brl } from '@/lib/format';
 import { goalPositionsAt, planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
+import { CashFlowResult, dailyCashFlow } from '@/lib/engine/cashflow';
 import { formatMonth, monthRange } from '@/lib/engine/months';
 import {
   DEFAULT_HORIZON,
@@ -19,6 +23,22 @@ import {
 } from '@/lib/engine/projection';
 import { profileName, useProfiles } from '@/lib/useProfiles';
 import type { Profile } from '@/lib/types';
+
+const tooltipStyle = {
+  background: 'var(--tooltip-bg)',
+  border: '1px solid var(--tooltip-border)',
+  borderRadius: 10,
+  color: 'var(--tooltip-text)',
+  fontSize: 12.5,
+};
+const axis = { fontSize: 11, fill: 'var(--muted)' } as const;
+const kfmt = (v: number) => `${Math.round(v / 1000)}k`;
+
+/** 'YYYY-MM-DD' → 'DD/MM'. */
+function formatDay(date: string): string {
+  const [, m, d] = date.split('-');
+  return `${d}/${m}`;
+}
 
 const KIND_LABEL: Record<DetailKind, string> = {
   recurring: 'recorrente',
@@ -114,6 +134,65 @@ function ItemsTable({
   );
 }
 
+/** Alerta + gráfico do saldo em contas dia a dia — sinaliza se e quando faltará caixa. */
+function CashFlowSection({ cashFlow }: { cashFlow: CashFlowResult }) {
+  const tone = cashFlow.withdrawalNeeded ? 'var(--neg)' : 'var(--pos)';
+  const minDay = cashFlow.days.find((d) => d.date === cashFlow.minBalanceDate)?.day;
+  const chartData = cashFlow.days.map((d) => ({ dia: d.day, Saldo: d.balance }));
+  const tickInterval = Math.max(0, Math.ceil(cashFlow.days.length / 10) - 1);
+
+  return (
+    <section className="card mb-6">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="font-display m-0 text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
+          Fluxo de caixa do mês <InfoTip g="fluxo-caixa-diario" className="font-normal" />
+        </h2>
+      </div>
+
+      <div
+        className="mb-4 rounded-2xl border px-4 py-3 text-sm font-medium"
+        style={{
+          borderColor: `color-mix(in srgb, ${tone} 30%, transparent)`,
+          background: `color-mix(in srgb, ${tone} 10%, transparent)`,
+          color: tone,
+        }}
+      >
+        {cashFlow.withdrawalNeeded ? (
+          <>
+            ⚠️ Será necessário retirar <strong>{brl.format(cashFlow.withdrawalAmount)}</strong> de investimentos —
+            o saldo em contas fica negativo em <strong>{formatDay(cashFlow.withdrawalDate!)}</strong>, chegando a{' '}
+            {brl.format(cashFlow.minBalance)} em {formatDay(cashFlow.minBalanceDate!)}.
+          </>
+        ) : (
+          <>
+            ✅ Sem necessidade de retirada de investimentos neste mês — saldo mínimo projetado em contas de{' '}
+            <strong>{brl.format(cashFlow.minBalance)}</strong>
+            {cashFlow.minBalanceDate ? ` em ${formatDay(cashFlow.minBalanceDate)}` : ''}.
+          </>
+        )}
+      </div>
+
+      <ResponsiveContainer width="100%" height={240}>
+        <AreaChart data={chartData} margin={{ left: 12, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
+          <XAxis dataKey="dia" tick={axis} interval={tickInterval} tickFormatter={(d) => String(d)} />
+          <YAxis tick={axis} tickFormatter={kfmt} />
+          <Tooltip
+            formatter={(v: any) => brl.format(Number(v))}
+            labelFormatter={(d) => `Dia ${d}`}
+            contentStyle={tooltipStyle}
+          />
+          <ReferenceLine y={0} stroke="var(--line)" />
+          <Area dataKey="Saldo" stroke={tone} fill={tone} fillOpacity={0.15} strokeWidth={2} dot={false} />
+          {cashFlow.withdrawalNeeded && minDay !== undefined && (
+            <ReferenceDot x={minDay} y={cashFlow.minBalance} r={5} fill="var(--neg)" stroke="none" />
+          )}
+        </AreaChart>
+      </ResponsiveContainer>
+    </section>
+  );
+}
+
 function Resumo() {
   const [data, setData] = useState<AppData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -185,6 +264,24 @@ function Resumo() {
     const incomeTotal = detail.incomes.reduce((s, i) => s + i.amount, 0);
     const expenseTotal = detail.expenses.reduce((s, e) => s + e.amount, 0);
 
+    // Fluxo de caixa diário (docs/PROJECTION_ENGINE.md §5): parte do saldo real em contas
+    // (sem investimentos) e acumula o saldo livre projetado dos meses até o anterior ao
+    // selecionado — aproximação de quanto estará em contas no início daquele mês.
+    const priorFreeBalance = proj
+      .filter((p) => p.month < month)
+      .reduce((s, p) => s + p.freeBalance, 0);
+    const cashFlowStart = Math.round((currentAccountsBalance(data) + priorFreeBalance) * 100) / 100;
+    const cashFlow = dailyCashFlow({
+      month,
+      startBalance: cashFlowStart,
+      recurringIncomes: data.recurringIncomes,
+      oneOffIncomes: data.oneOffIncomes,
+      recurringExpenses: data.recurringExpenses,
+      plannedExpenses: data.plannedExpenses,
+      creditCards: data.creditCards,
+      cardBills: data.cardBills,
+    });
+
     return {
       detail,
       incomeTotal: Math.round(incomeTotal * 100) / 100,
@@ -193,6 +290,7 @@ function Resumo() {
       monthWealth,
       goalRows,
       totalContribution: Math.round(totalContribution * 100) / 100,
+      cashFlow,
     };
   }, [data, month, startMonth]);
 
@@ -254,6 +352,9 @@ function Resumo() {
         <Kpi title="Saldo livre" value={brl.format(free)} g="saldo-livre" tone={free >= 0 ? 'good' : 'bad'} />
         <Kpi title="Patrimônio projetado" value={brl.format(wealth)} g="patrimonio" tone="accent" />
       </div>
+
+      {/* Fluxo de caixa diário */}
+      <CashFlowSection cashFlow={view.cashFlow} />
 
       {/* Lançamentos previstos */}
       <div className="mb-6 grid gap-5 md:grid-cols-2">

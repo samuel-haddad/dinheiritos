@@ -9,7 +9,7 @@ const ri = (o: Partial<RecurringIncome>): RecurringIncome => ({
   periodicity: 'mensal', interval_months: 1, ...o,
 });
 const re = (o: Partial<RecurringExpense>): RecurringExpense => ({
-  id: 'e1', profile_id: 'p', name: 'd', amount: 400,
+  id: 'e1', profile_id: 'p', name: 'd', amount: 400, payment_day: null,
   start_month: '2026-01-01', end_month: null, active: true,
   periodicity: 'mensal', interval_months: 1, ...o,
 });
@@ -20,7 +20,7 @@ const card = (o: Partial<CreditCard>): CreditCard => ({
 const planned = (o: Partial<PlannedExpense>): PlannedExpense => ({
   id: 'pl1', profile_id: 'p', name: 'parc', total_amount: 300, installments: 3,
   installment_amount: 100, start_month: '2026-08-01', end_month: '2026-11-01',
-  confirmed: false, active: true, is_card_expense: false, credit_card_id: null, ...o,
+  confirmed: false, active: true, is_card_expense: false, credit_card_id: null, due_day: null, ...o,
 });
 
 const base = {

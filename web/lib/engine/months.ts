@@ -30,6 +30,12 @@ export function monthRange(start: Month, count: number): Month[] {
   return Array.from({ length: count }, (_, i) => addMonths(start, i));
 }
 
+/** Nº de dias no mês (considera ano bissexto). */
+export function daysInMonth(month: Month): number {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
 export function formatMonth(month: Month): string {
   const [y, m] = month.split('-');
   const nomes = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];

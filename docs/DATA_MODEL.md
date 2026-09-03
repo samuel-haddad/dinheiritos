@@ -43,6 +43,7 @@ Ex.: condomínio, financiamento, telefonia. *(planilha: `despesas_recorrentes`)*
 | active | boolean | |
 | periodicity | text | `mensal` \| `anual` \| `custom` (migration 0004) |
 | interval_months | int | meses entre ocorrências: mensal=1, anual=12, custom=N |
+| payment_day | int null | dia do mês em que é paga (migration 0011). Sem valor = fluxo de caixa diário assume dia 1 |
 
 ### `one_off_incomes` — receitas pontuais
 Ex.: férias, 13º. *(planilha: `receitas_pontuais`)*
@@ -72,6 +73,7 @@ Ex.: empréstimo, obra do jardim, 13º de funcionárias. *(planilha: `previsoes`
 | active | boolean | migration 0003 (toggle Ativas/Desativadas) |
 | is_card_expense | boolean | migration 0010 — previsão vinculada a um cartão. Default `false` |
 | credit_card_id | uuid FK credit_cards null | obrigatório quando `is_card_expense = true` (migration 0010) |
+| due_day | int null | dia do mês em que a parcela vence (migration 0011). Sem valor = fluxo de caixa diário assume dia 1 |
 
 **Previsão vinculada a cartão:** quando `is_card_expense = true`, se o mês da parcela já
 tiver fatura lançada em `card_bills` para `credit_card_id`, a parcela daquele mês **não**
@@ -126,6 +128,8 @@ lançada para o mês, a parcela soma normalmente, como qualquer previsão (ver
 | amount | numeric | total da fatura |
 
 Único por (`credit_card_id`, `month`). Projeção usa `amount` quando existe; senão `base_amount` do cartão.
+`card_bills` não tem coluna de dia própria — o fluxo de caixa diário usa `credit_cards.due_day`
+como o dia do mês da despesa, seja fatura real ou `base_amount` (§5 de `docs/PROJECTION_ENGINE.md`).
 
 ### `investments`
 *(planilha: `investimento` — locais fixos)*
