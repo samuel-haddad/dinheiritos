@@ -9,6 +9,7 @@ import Toggle from '@/components/Toggle';
 import { brl } from '@/lib/format';
 import { addMonths, diffMonths, formatMonth } from '@/lib/engine/months';
 import { profileName, useProfiles } from '@/lib/useProfiles';
+import { creditCardName, useCreditCards } from '@/lib/useCreditCards';
 
 const TABS = ['Receitas recorrentes', 'Despesas recorrentes', 'Receitas pontuais', 'Previsões'];
 
@@ -53,6 +54,11 @@ function Lancamentos() {
   const profiles = useProfiles();
   const profOpts: Option[] = profiles.map((p) => ({ value: p.id, label: p.name }));
   const owner = (r: any) => profileName(profiles, r.profile_id);
+  const cards = useCreditCards();
+  const cardOpts: Option[] = cards.map((c) => ({
+    value: c.id,
+    label: `${c.name} (${profileName(profiles, c.profile_id)})`,
+  }));
 
   const configs = useMemo<Record<string, EntityConfig>>(() => {
     const vigencia = (r: any) =>
@@ -140,6 +146,15 @@ function Lancamentos() {
           { key: 'start_month', label: 'Primeira parcela', type: 'month', required: true },
           { key: 'profile_id', label: 'Responsável', type: 'select', options: profOpts, required: true },
           { key: 'confirmed', label: 'Compromisso confirmado', type: 'checkbox' },
+          { key: 'is_card_expense', label: 'Cartão', type: 'checkbox' },
+          {
+            key: 'credit_card_id',
+            label: 'Cartão vinculado',
+            type: 'select',
+            options: cardOpts,
+            showIf: (f) => Boolean(f.is_card_expense),
+            help: 'Quando a fatura do mês já tiver sido lançada, a parcela some do cálculo naquele mês (já está na fatura real).',
+          },
           { key: 'active', label: 'Ativa', type: 'checkbox' },
         ],
         columns: [
@@ -156,23 +171,30 @@ function Lancamentos() {
             render: (r) => `${monthCell(r.start_month)} → ${monthCell(addMonths(r.end_month, -1))}`,
           },
           { key: 'profile_id', label: 'Responsável', render: owner },
+          {
+            key: 'is_card_expense',
+            label: 'Cartão',
+            render: (r) => (r.is_card_expense ? creditCardName(cards, r.credit_card_id) : 'Não'),
+          },
           { key: 'active', label: 'Ativa', render: (r) => (r.active ? 'Sim' : 'Não') },
         ],
-        defaults: { installments: '1', confirmed: false, active: true },
+        defaults: { installments: '1', confirmed: false, active: true, is_card_expense: false },
         order: [{ column: 'start_month' }],
         beforeSave: (row) => {
           const n = Math.max(1, Number(row.installments) || 1);
           if (!row.total_amount || !row.start_month) return 'Preencha valor total e primeira parcela.';
+          if (row.is_card_expense && !row.credit_card_id) return 'Selecione o cartão vinculado.';
           return {
             ...row,
             installments: n,
             installment_amount: Math.round((Number(row.total_amount) / n) * 100) / 100,
             end_month: addMonths(String(row.start_month), n),
+            credit_card_id: row.is_card_expense ? row.credit_card_id : null,
           };
         },
       },
     };
-  }, [profOpts]);
+  }, [profOpts, cardOpts, cards]);
 
   return (
     <>

@@ -40,6 +40,14 @@ const occurs = (month: Month, start: Month, interval: number | null | undefined)
   return diffMonths(start, month) % step === 0;
 };
 
+/**
+ * Uma previsão vinculada a cartão (`is_card_expense`) já é fatura real quando `card_bills`
+ * tem lançamento para (`credit_card_id`, `month`) — a parcela some naquele mês para não
+ * contar em dobro com `cardExpenses`. Ver docs/PROJECTION_ENGINE.md §1.
+ */
+const suppressedByCardBill = (p: PlannedExpense, month: Month, bills: Map<string, number>): boolean =>
+  p.is_card_expense && !!p.credit_card_id && bills.has(`${p.credit_card_id}|${month}`);
+
 export function project(input: ProjectionInput): MonthProjection[] {
   const bills = new Map<string, number>();
   for (const b of input.cardBills) {
@@ -60,9 +68,11 @@ export function project(input: ProjectionInput): MonthProjection[] {
       .filter((e) => e.active && inRange(month, e.start_month, e.end_month) && occurs(month, e.start_month, e.interval_months))
       .reduce((s, e) => s + Number(e.amount), 0);
 
-    // Parcela conta no mês se month ∈ [start_month, end_month)
+    // Parcela conta no mês se month ∈ [start_month, end_month) — exceto quando vinculada
+    // a um cartão cuja fatura do mês já foi lançada (já é fatura real, ver suppressedByCardBill).
     const plannedInstallments = input.plannedExpenses
       .filter((p) => p.active && month >= p.start_month && month < p.end_month)
+      .filter((p) => !suppressedByCardBill(p, month, bills))
       .reduce((s, p) => s + Number(p.installment_amount), 0);
 
     // Fatura real quando existe; senão valor-base do cartão
@@ -145,7 +155,7 @@ export function monthDetail(input: MonthDetailInput, month: Month): MonthDetail 
     }
   }
   for (const p of input.plannedExpenses) {
-    if (p.active && month >= p.start_month && month < p.end_month) {
+    if (p.active && month >= p.start_month && month < p.end_month && !suppressedByCardBill(p, month, bills)) {
       expenses.push({ id: p.id, name: p.name, amount: r2(Number(p.installment_amount)), profileId: p.profile_id, kind: 'planned' });
     }
   }

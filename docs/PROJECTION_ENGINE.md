@@ -23,11 +23,18 @@ recorrentes têm periodicidade — previsões (`planned_expenses`) seguem parcel
 
 ```
 expenses(M) = Σ recurring_expenses ativas em M
-            + Σ parcelas de planned_expenses com M ∈ [start_month, end_month)
+            + Σ parcelas de planned_expenses com M ∈ [start_month, end_month), exceto as suprimidas (ver abaixo)
             + Σ fatura(cartão, M) para cada cartão ativo
 ```
 
 **Regra da fatura:** se existe `card_bills` para (cartão, M), usa o valor real; senão usa `credit_cards.base_amount`. Isso permite projetar meses futuros antes das faturas fecharem.
+
+**Previsão vinculada a cartão (`is_card_expense` + `credit_card_id`, ver `docs/DATA_MODEL.md`):**
+uma parcela de `planned_expenses` marcada como despesa de cartão é **suprimida** no mês M
+quando já existe `card_bills` para (`credit_card_id`, M) — nesse caso o gasto já está
+refletido na fatura real (`cardExpenses` acima), então somar a parcela também dobraria o
+valor. Sem fatura lançada para M, a parcela soma normalmente, como qualquer previsão.
+Previsões sem `is_card_expense` (o padrão) não são afetadas por esta regra.
 
 **Saldo livre**
 
