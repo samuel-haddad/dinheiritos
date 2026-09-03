@@ -58,6 +58,13 @@ export interface PlannedExpense {
   end_month: Month;
   confirmed: boolean;
   active: boolean;
+  /**
+   * Previsão vinculada a um cartão (`credit_card_id`): quando a fatura do mês já foi
+   * lançada em `card_bills`, a parcela daquele mês não soma nos cálculos (o gasto já
+   * está refletido na fatura real) — ver docs/PROJECTION_ENGINE.md §1.
+   */
+  is_card_expense: boolean;
+  credit_card_id: string | null;
 }
 
 export interface Account {

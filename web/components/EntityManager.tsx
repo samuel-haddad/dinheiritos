@@ -18,6 +18,8 @@ export interface FieldDef {
   options?: Option[];
   required?: boolean;
   help?: string;
+  /** Mostra o campo só quando o predicado (sobre o form atual) é verdadeiro. */
+  showIf?: (form: Record<string, any>) => boolean;
 }
 
 export interface ColumnDef {
@@ -369,7 +371,7 @@ export default function EntityManager({
               </button>
             </div>
             <div className="flex flex-col gap-4">
-              {config.fields.map((fd) => (
+              {config.fields.filter((fd) => !fd.showIf || fd.showIf(form)).map((fd) => (
                 <div key={fd.key}>
                   {fd.type === 'select' ? (
                     <>

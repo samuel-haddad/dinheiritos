@@ -70,6 +70,14 @@ Ex.: empréstimo, obra do jardim, 13º de funcionárias. *(planilha: `previsoes`
 | end_month | date | gerado: start + installments |
 | confirmed | boolean | previsão virou compromisso real? |
 | active | boolean | migration 0003 (toggle Ativas/Desativadas) |
+| is_card_expense | boolean | migration 0010 — previsão vinculada a um cartão. Default `false` |
+| credit_card_id | uuid FK credit_cards null | obrigatório quando `is_card_expense = true` (migration 0010) |
+
+**Previsão vinculada a cartão:** quando `is_card_expense = true`, se o mês da parcela já
+tiver fatura lançada em `card_bills` para `credit_card_id`, a parcela daquele mês **não**
+soma nos cálculos (o gasto já está refletido na fatura real, evitando dobrar). Sem fatura
+lançada para o mês, a parcela soma normalmente, como qualquer previsão (ver
+`docs/PROJECTION_ENGINE.md` §1).
 
 ## Observações (snapshots mensais)
 

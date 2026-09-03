@@ -20,7 +20,7 @@ const card = (o: Partial<CreditCard>): CreditCard => ({
 const planned = (o: Partial<PlannedExpense>): PlannedExpense => ({
   id: 'pl1', profile_id: 'p', name: 'parc', total_amount: 300, installments: 3,
   installment_amount: 100, start_month: '2026-08-01', end_month: '2026-11-01',
-  confirmed: false, active: true, ...o,
+  confirmed: false, active: true, is_card_expense: false, credit_card_id: null, ...o,
 });
 
 const base = {
@@ -124,6 +124,31 @@ describe('project', () => {
     expect(out[4].plannedInstallments).toBe(0); // nov (fim exclusivo)
   });
 
+  it('previsão vinculada a cartão soma normalmente quando a fatura do mês não existe', () => {
+    const out = project({
+      ...base,
+      plannedExpenses: [planned({ is_card_expense: true, credit_card_id: 'c1' })],
+    });
+    expect(out[1].plannedInstallments).toBe(100); // ago — sem fatura lançada
+    expect(out[1].totalExpenses).toBe(100);
+  });
+
+  it('previsão vinculada a cartão some no mês em que a fatura já foi lançada', () => {
+    const out = project({
+      ...base,
+      creditCards: [card({ id: 'c1', base_amount: 0 })],
+      cardBills: [{ id: 'b', credit_card_id: 'c1', month: '2026-08-01', amount: 900 }],
+      plannedExpenses: [planned({ is_card_expense: true, credit_card_id: 'c1' })],
+    });
+    // ago: fatura já lançada — a parcela não soma, só a fatura real conta
+    expect(out[1].plannedInstallments).toBe(0);
+    expect(out[1].cardExpenses).toBe(900);
+    expect(out[1].totalExpenses).toBe(900);
+    // set: sem fatura ainda — a parcela volta a somar normalmente
+    expect(out[2].plannedInstallments).toBe(100);
+    expect(out[2].cardExpenses).toBe(0);
+  });
+
   it('patrimônio acumula saldo livre', () => {
     const out = project({
       ...base,
@@ -173,5 +198,18 @@ describe('monthDetail', () => {
     const d = monthDetail(input, '2026-08-01');
     expect(d.expenses.find((e) => e.kind === 'card')!.amount).toBe(500);
     expect(d.incomes.map((i) => i.name)).toEqual(['Salário']); // pontual só em julho
+  });
+
+  it('previsão vinculada a cartão não aparece no mês em que a fatura já foi lançada', () => {
+    const withCardPlanned = {
+      ...input,
+      plannedExpenses: [
+        planned({ id: 'pl1', name: 'Obra', installment_amount: 100, start_month: '2026-07-01', end_month: '2026-10-01', is_card_expense: true, credit_card_id: 'c1' }),
+      ],
+    };
+    const d = monthDetail(withCardPlanned, '2026-07-01'); // julho já tem fatura em `input.cardBills`
+    expect(d.expenses.map((e) => e.kind).sort()).toEqual(['card', 'recurring']);
+    const d2 = monthDetail(withCardPlanned, '2026-08-01'); // agosto sem fatura lançada
+    expect(d2.expenses.map((e) => e.kind).sort()).toEqual(['card', 'planned', 'recurring']);
   });
 });
