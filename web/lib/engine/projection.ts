@@ -34,8 +34,11 @@ export interface MonthProjection {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Recorre no mês? Ocorrência a cada `interval` meses a partir de `start`. */
-const occurs = (month: Month, start: Month, interval: number | null | undefined): boolean => {
+/**
+ * Recorre no mês? Ocorrência a cada `interval` meses a partir de `start`.
+ * Exportado para reuso pelo fluxo de caixa diário (`./cashflow.ts`) — mesma regra.
+ */
+export const occurs = (month: Month, start: Month, interval: number | null | undefined): boolean => {
   const step = Math.max(1, Number(interval) || 1);
   return diffMonths(start, month) % step === 0;
 };
@@ -44,8 +47,9 @@ const occurs = (month: Month, start: Month, interval: number | null | undefined)
  * Uma previsão vinculada a cartão (`is_card_expense`) já é fatura real quando `card_bills`
  * tem lançamento para (`credit_card_id`, `month`) — a parcela some naquele mês para não
  * contar em dobro com `cardExpenses`. Ver docs/PROJECTION_ENGINE.md §1.
+ * Exportado para reuso pelo fluxo de caixa diário (`./cashflow.ts`).
  */
-const suppressedByCardBill = (p: PlannedExpense, month: Month, bills: Map<string, number>): boolean =>
+export const suppressedByCardBill = (p: PlannedExpense, month: Month, bills: Map<string, number>): boolean =>
   p.is_card_expense && !!p.credit_card_id && bills.has(`${p.credit_card_id}|${month}`);
 
 export function project(input: ProjectionInput): MonthProjection[] {

@@ -35,6 +35,8 @@ export interface RecurringExpense {
   active: boolean;
   periodicity: Periodicity;
   interval_months: number;
+  /** Dia do mês em que a despesa é paga (fluxo de caixa diário). Sem valor = assume dia 1. */
+  payment_day: number | null;
 }
 
 export interface OneOffIncome {
@@ -65,6 +67,8 @@ export interface PlannedExpense {
    */
   is_card_expense: boolean;
   credit_card_id: string | null;
+  /** Dia do mês em que a parcela vence (fluxo de caixa diário). Sem valor = assume dia 1. */
+  due_day: number | null;
 }
 
 export interface Account {

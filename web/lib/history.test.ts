@@ -20,7 +20,7 @@ const inc = (o: Partial<RecurringIncome>): RecurringIncome => ({
   active: o.active ?? true, periodicity: 'mensal', interval_months: o.interval_months ?? 1,
 });
 const exp = (o: Partial<RecurringExpense>): RecurringExpense => ({
-  id: o.id ?? 'e', profile_id: 'p', name: o.name ?? 'Aluguel', amount: o.amount ?? 0,
+  id: o.id ?? 'e', profile_id: 'p', name: o.name ?? 'Aluguel', amount: o.amount ?? 0, payment_day: null,
   start_month: o.start_month ?? '2026-07-01', end_month: o.end_month ?? null,
   active: o.active ?? true, periodicity: 'mensal', interval_months: o.interval_months ?? 1,
 });

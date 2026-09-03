@@ -110,6 +110,12 @@ export const GLOSSARY: GlossaryEntry[] = [
     desc: 'Construída a partir dos snapshots de investimento. Quanto mais fechamentos mensais registrados, mais longa a série. O gráfico só aparece a partir de dois meses de posições lançadas — continue registrando os fechamentos mensais para vê-lo crescer.',
   },
   {
+    id: 'fluxo-caixa-diario',
+    term: 'Fluxo de caixa diário',
+    formula: 'saldo em contas no início do mês + Σ receitas do dia − Σ despesas do dia, dia a dia',
+    desc: 'Distribui receitas, despesas recorrentes, parcelas de previsões e faturas de cartão pelo dia do mês em que ocorrem (dia do recebimento/pagamento/vencimento; sem essa informação, assume o dia 1) e acumula o saldo em contas correntes dia a dia. Não considera investimentos — só quando o saldo em contas fica negativo é que seria necessário sacar deles para cobrir as despesas do mês.',
+  },
+  {
     id: 'mes-fechado',
     term: 'Mês fechado',
     formula: 'mês com snapshots e faturas reais lançados',

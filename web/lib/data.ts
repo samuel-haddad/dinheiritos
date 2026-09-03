@@ -107,6 +107,21 @@ export function currentNetWorth(data: AppData): number {
   return Math.round(total * 100) / 100;
 }
 
+/**
+ * Saldo atual em contas correntes (último snapshot de cada conta, sem investimentos).
+ * Base do fluxo de caixa diário (`lib/engine/cashflow.ts`) — é o dinheiro efetivamente
+ * disponível para pagar despesas; investimentos só entram se esse saldo ficar negativo.
+ */
+export function currentAccountsBalance(data: AppData): number {
+  const latest = new Map<string, { month: string; balance: number }>();
+  for (const s of data.accountSnapshots) {
+    if (!latest.has(s.account_id) || s.month > latest.get(s.account_id)!.month) latest.set(s.account_id, s);
+  }
+  let total = 0;
+  latest.forEach((v) => (total += Number(v.balance)));
+  return Math.round(total * 100) / 100;
+}
+
 /** Total investido: último snapshot de cada investimento (sem contas). */
 export function currentInvestedTotal(data: AppData): number {
   const latest = new Map<string, { month: string; balance: number }>();
