@@ -74,6 +74,7 @@ Ex.: empréstimo, obra do jardim, 13º de funcionárias. *(planilha: `previsoes`
 | is_card_expense | boolean | migration 0010 — previsão vinculada a um cartão. Default `false` |
 | credit_card_id | uuid FK credit_cards null | obrigatório quando `is_card_expense = true` (migration 0010) |
 | due_day | int null | dia do mês em que a parcela vence (migration 0011). Sem valor = fluxo de caixa diário assume dia 1 |
+| goal_id | uuid FK goals null | meta vinculada (migration 0012) — enquanto ativa, deduz `total_amount` do `target_amount` da meta (ver seção `goals` abaixo e `docs/PROJECTION_ENGINE.md` §2) |
 
 **Previsão vinculada a cartão:** quando `is_card_expense = true`, se o mês da parcela já
 tiver fatura lançada em `card_bills` para `credit_card_id`, a parcela daquele mês **não**
@@ -172,6 +173,12 @@ como o dia do mês da despesa, seja fatura real ou `base_amount` (§5 de `docs/P
 Campos calculados (posição atual, faltante, aporte mínimo, status/alcance) **não são colunas**: a posição vem do **patrimônio** (contas + investimentos) distribuído por prazo, com teto no alvo e excedente cascateando (`docs/PROJECTION_ENGINE.md` §2). As colunas `weight` (legada) e `achieved` foram removidas na migration 0005, e a tabela `goal_contributions` foi descontinuada — não há mais aportes manuais.
 
 `category` **não** muda a alocação/aporte (§2 continua igual para as duas categorias) — só é usada no cálculo do Patrimônio Projetado ajustado (`docs/PROJECTION_ENGINE.md` §1): metas `gasto` não pausadas têm o valor já reservado a elas descontado do patrimônio bruto, mês a mês, porque esse valor está comprometido com um gasto futuro e não é patrimônio disponível.
+
+**Alvo líquido de previsões vinculadas** (migration 0012, `planned_expenses.goal_id`): assim
+como a posição, o alvo efetivamente usado no motor também é **calculado, não persistido** —
+`target_amount` na coluna continua sendo o valor original que o usuário definiu. Toda previsão
+ativa vinculada a uma meta deduz seu `total_amount` desse alvo (piso em 0) antes de qualquer
+cálculo de posição/aporte/status; ver `docs/PROJECTION_ENGINE.md` §2.
 
 ## Acesso
 

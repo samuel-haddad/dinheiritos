@@ -20,7 +20,7 @@ const planned = (o: Partial<PlannedExpense>): PlannedExpense => ({
   id: 'pl1', profile_id: 'p', name: 'parc', total_amount: 300, installments: 3,
   installment_amount: 100, start_month: '2026-08-01', end_month: '2026-11-01',
   confirmed: false, active: true, is_card_expense: false, credit_card_id: null,
-  due_day: 20, ...o,
+  due_day: 20, goal_id: null, ...o,
 });
 
 const base = {
@@ -83,6 +83,25 @@ describe('dailyCashFlow', () => {
     });
     expect(out.days).toHaveLength(30);
     expect(out.days[29].expenses).toBe(100);
+  });
+
+  it('receita recorrente todo dia 30, em fevereiro cai no último dia do mês (28 ou 29)', () => {
+    // cenário do pedido: "recebimento de investimento todo dia 30" caindo num fevereiro
+    const out = dailyCashFlow({
+      ...base,
+      month: '2026-02-01', // 2026 não é bissexto → 28 dias
+      recurringIncomes: [ri({ amount: 300, receipt_day: 30, start_month: '2026-01-01' })],
+    });
+    expect(out.days).toHaveLength(28);
+    expect(out.days[27].income).toBe(300);
+
+    const leap = dailyCashFlow({
+      ...base,
+      month: '2028-02-01', // 2028 é bissexto → 29 dias
+      recurringIncomes: [ri({ amount: 300, receipt_day: 30, start_month: '2026-07-01' })],
+    });
+    expect(leap.days).toHaveLength(29);
+    expect(leap.days[28].income).toBe(300);
   });
 
   it('parcela de previsão soma no due_day; suprimida quando a fatura do cartão já foi lançada', () => {

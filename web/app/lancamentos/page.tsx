@@ -10,6 +10,7 @@ import { brl } from '@/lib/format';
 import { addMonths, diffMonths, formatMonth } from '@/lib/engine/months';
 import { profileName, useProfiles } from '@/lib/useProfiles';
 import { creditCardName, useCreditCards } from '@/lib/useCreditCards';
+import { goalName, useGoals } from '@/lib/useGoals';
 
 const TABS = ['Receitas recorrentes', 'Despesas recorrentes', 'Receitas pontuais', 'Previsões'];
 
@@ -58,6 +59,11 @@ function Lancamentos() {
   const cardOpts: Option[] = cards.map((c) => ({
     value: c.id,
     label: `${c.name} (${profileName(profiles, c.profile_id)})`,
+  }));
+  const goals = useGoals();
+  const goalOpts: Option[] = goals.map((g) => ({
+    value: g.id,
+    label: `${g.name} (${profileName(profiles, g.profile_id)})`,
   }));
 
   const configs = useMemo<Record<string, EntityConfig>>(() => {
@@ -158,6 +164,13 @@ function Lancamentos() {
             showIf: (f) => Boolean(f.is_card_expense),
             help: 'Quando a fatura do mês já tiver sido lançada, a parcela some do cálculo naquele mês (já está na fatura real).',
           },
+          {
+            key: 'goal_id',
+            label: 'Meta',
+            type: 'select',
+            options: goalOpts,
+            help: 'Enquanto esta previsão estiver ativa, o valor total dela é deduzido do alvo da meta escolhida. Ao apagar ou desativar a previsão, o alvo volta ao normal.',
+          },
           { key: 'active', label: 'Ativa', type: 'checkbox' },
         ],
         columns: [
@@ -180,6 +193,7 @@ function Lancamentos() {
             label: 'Cartão',
             render: (r) => (r.is_card_expense ? creditCardName(cards, r.credit_card_id) : 'Não'),
           },
+          { key: 'goal_id', label: 'Meta', render: (r) => (r.goal_id ? goalName(goals, r.goal_id) : '—') },
           { key: 'active', label: 'Ativa', render: (r) => (r.active ? 'Sim' : 'Não') },
         ],
         defaults: { installments: '1', confirmed: false, active: true, is_card_expense: false },
@@ -198,7 +212,7 @@ function Lancamentos() {
         },
       },
     };
-  }, [profOpts, cardOpts, cards]);
+  }, [profOpts, cardOpts, cards, goalOpts, goals]);
 
   return (
     <>

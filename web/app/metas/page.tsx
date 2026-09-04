@@ -11,7 +11,10 @@ import HealthChip from '@/components/HealthChip';
 import Shell from '@/components/Shell';
 import Toggle from '@/components/Toggle';
 import { AppData, brl, currentNetWorth, loadAppData, setAllocationMode } from '@/lib/data';
-import { GoalHealth, GoalStatus, MonthAllocation, planGoals, requiredHorizon } from '@/lib/engine/allocation';
+import {
+  GoalHealth, GoalStatus, MonthAllocation, goalsWithDeductions, plannedDeductionsByGoal,
+  planGoals, requiredHorizon,
+} from '@/lib/engine/allocation';
 import { formatMonth, monthRange } from '@/lib/engine/months';
 import { defaultStartMonth, project } from '@/lib/engine/projection';
 import { supabase } from '@/lib/supabase';
@@ -185,15 +188,19 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 }
 
 function GoalDetail({
-  s, monthly, ownerName, onClose,
+  s, monthly, ownerName, rawTarget, deduction, onClose,
 }: {
   s: GoalStatus;
   monthly: MonthAllocation[];
   ownerName: string;
+  /** Valor-alvo original (antes de deduzir previsões vinculadas). */
+  rawTarget: number;
+  /** Quanto do alvo original foi deduzido por previsões vinculadas. */
+  deduction: number;
   onClose: () => void;
 }) {
   const EPS = 0.005;
-  const target = Number(s.goal.target_amount);
+  const target = Number(s.goal.target_amount); // já líquido de previsões vinculadas
 
   // Série mês a mês: posição acumulada (base) + aporte estimado do mês (topo).
   // posição(M+1) = posição(M) + aporte(M). Vai até o mês em que conclui.
@@ -214,7 +221,7 @@ function GoalDetail({
     series.push({ label: formatMonth(defaultStartMonth()), Posição: Math.min(s.current, target), 'Aporte do mês': 0 });
   }
 
-  const pct = Math.min(100, (s.current / target) * 100);
+  const pct = target > 0 ? Math.min(100, (s.current / target) * 100) : 100;
   const tickEvery = Math.max(0, Math.ceil(series.length / 12) - 1);
 
   return (
@@ -224,7 +231,15 @@ function GoalDetail({
 
         <div className="rounded-2xl px-4" style={{ background: 'var(--surface-2)' }}>
           <InfoRow label="Responsável">{ownerName}</InfoRow>
-          <InfoRow label="Valor-alvo">{brl.format(target)}</InfoRow>
+          {deduction > EPS ? (
+            <>
+              <InfoRow label="Valor-alvo original">{brl.format(rawTarget)}</InfoRow>
+              <InfoRow label="Reduzido por previsões vinculadas">− {brl.format(deduction)}</InfoRow>
+              <InfoRow label="Valor-alvo líquido">{brl.format(target)}</InfoRow>
+            </>
+          ) : (
+            <InfoRow label="Valor-alvo">{brl.format(target)}</InfoRow>
+          )}
           <InfoRow label="Prazo">{formatMonth(s.goal.deadline)}</InfoRow>
           <InfoRow label="Posição atual (do patrimônio)">
             {brl.format(s.current)} <span className="text-xs" style={{ color: 'var(--muted)' }}>({pct.toFixed(0)}%)</span>
@@ -269,10 +284,12 @@ function GoalDetail({
 
 // ---------- card de meta ----------
 function GoalCard({
-  s, ownerName, onOpen, onEdit, onMove, onDelete, first, last, selected, onToggleSelect, priorityMode,
+  s, ownerName, deduction, onOpen, onEdit, onMove, onDelete, first, last, selected, onToggleSelect, priorityMode,
 }: {
   s: GoalStatus;
   ownerName: string;
+  /** Quanto do alvo original foi deduzido por previsões vinculadas (0 = nenhuma). */
+  deduction: number;
   onOpen: () => void;
   onEdit: () => void;
   onMove: (dir: -1 | 1) => void;
@@ -283,8 +300,8 @@ function GoalCard({
   onToggleSelect: () => void;
   priorityMode: boolean;
 }) {
-  const target = Number(s.goal.target_amount);
-  const pct = Math.min(100, (s.current / target) * 100);
+  const target = Number(s.goal.target_amount); // já líquido de previsões vinculadas
+  const pct = target > 0 ? Math.min(100, (s.current / target) * 100) : 100;
   const active = s.health === 'on_track' || s.health === 'late' || s.health === 'infeasible';
   const barColor = s.health === 'infeasible' ? 'var(--neg)' : 'var(--accent)';
   return (
@@ -318,6 +335,11 @@ function GoalCard({
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
           <span className="num" style={{ color: 'var(--muted)' }}>
             {brl.format(s.current)} de {brl.format(target)} ({pct.toFixed(0)}%)
+            {deduction > 0.005 && (
+              <span className="ml-1.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+                (alvo reduzido em {brl.format(deduction)} por previsões vinculadas)
+              </span>
+            )}
           </span>
           {active && (
             <span className="num" style={{ color: 'var(--muted)' }}>
@@ -410,9 +432,13 @@ function Goals() {
   const view = useMemo(() => {
     if (!data || !engineInput) return null;
     const refMonth = defaultStartMonth();
-    const long = project({ ...engineInput, horizon: requiredHorizon(data.goals, refMonth) });
+    // Metas com o alvo líquido de previsões vinculadas (docs/PROJECTION_ENGINE.md §2) —
+    // `s.goal` em `plan.statuses` carrega esse alvo líquido daqui em diante; o `target_amount`
+    // bruto (para editar) continua em `data.goals`.
+    const goals = goalsWithDeductions(data.goals, data.plannedExpenses);
+    const long = project({ ...engineInput, horizon: requiredHorizon(goals, refMonth) });
     const plan = planGoals(
-      data.goals,
+      goals,
       currentNetWorth(data),
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
       refMonth,
@@ -437,7 +463,9 @@ function Goals() {
       return row;
     });
 
-    return { plan, ordered, evolution };
+    const deductions = plannedDeductionsByGoal(data.plannedExpenses);
+
+    return { plan, ordered, evolution, deductions };
   }, [data, engineInput]);
 
   // Viabilidade da meta em edição/criação (5.3): simula a lista com a meta prospectiva.
@@ -457,7 +485,10 @@ function Goals() {
       start_month: fromMonthInput(editing.start_month || toMonthInput(refMonth)),
       deadline: fromMonthInput(editing.deadline),
     };
-    const simGoals = [...data.goals.filter((g) => g.id !== editing.id), prospective];
+    const simGoals = goalsWithDeductions(
+      [...data.goals.filter((g) => g.id !== editing.id), prospective],
+      data.plannedExpenses
+    );
     const long = project({ ...engineInput, horizon: requiredHorizon(simGoals, refMonth) });
     const plan = planGoals(
       simGoals,
@@ -689,6 +720,7 @@ function Goals() {
             key={s.goal.id}
             s={s}
             ownerName={nameOf(s.goal.profile_id)}
+            deduction={view.deductions.get(s.goal.id) ?? 0}
             first={i === 0}
             last={i === view.ordered.length - 1}
             priorityMode={isPriority}
@@ -697,18 +729,21 @@ function Goals() {
             onOpen={() => setDetailingId(s.goal.id)}
             onMove={(dir) => move(i, dir)}
             onDelete={() => remove(s.goal)}
-            onEdit={() =>
+            onEdit={() => {
+              // s.goal carrega o alvo LÍQUIDO (deduzido de previsões vinculadas) — o
+              // formulário de edição deve ler/gravar sempre o target_amount ORIGINAL.
+              const raw = data.goals.find((g) => g.id === s.goal.id) ?? s.goal;
               setEditing({
-                id: s.goal.id,
-                name: s.goal.name,
-                target_amount: String(s.goal.target_amount),
-                deadline: toMonthInput(s.goal.deadline),
-                start_month: toMonthInput(s.goal.start_month),
-                profile_id: s.goal.profile_id,
-                paused: s.goal.paused,
-                category: s.goal.category,
-              })
-            }
+                id: raw.id,
+                name: raw.name,
+                target_amount: String(raw.target_amount),
+                deadline: toMonthInput(raw.deadline),
+                start_month: toMonthInput(raw.start_month),
+                profile_id: raw.profile_id,
+                paused: raw.paused,
+                category: raw.category,
+              });
+            }}
           />
         ))}
       </div>
@@ -728,11 +763,15 @@ function Goals() {
       {detailingId && (() => {
         const sd = view.ordered.find((x) => x.goal.id === detailingId);
         if (!sd) return null;
+        const deduction = view.deductions.get(sd.goal.id) ?? 0;
+        const rawTarget = data.goals.find((g) => g.id === sd.goal.id)?.target_amount ?? sd.goal.target_amount;
         return (
           <GoalDetail
             s={sd}
             monthly={view.plan.monthly}
             ownerName={nameOf(sd.goal.profile_id)}
+            deduction={deduction}
+            rawTarget={Number(rawTarget)}
             onClose={() => setDetailingId(null)}
           />
         );

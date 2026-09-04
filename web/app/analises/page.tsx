@@ -13,7 +13,7 @@ import Tabs from '@/components/Tabs';
 import { AppData, currentNetWorth, loadAppData } from '@/lib/data';
 import { deriveHistory } from '@/lib/history';
 import { brl } from '@/lib/format';
-import { planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
+import { goalsWithDeductions, planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
 import { formatMonth } from '@/lib/engine/months';
 import { DEFAULT_HORIZON, defaultStartMonth, project } from '@/lib/engine/projection';
 
@@ -62,10 +62,12 @@ function Analises() {
       creditCards: data.creditCards,
       cardBills: data.cardBills,
     };
+    // Metas com o alvo líquido de previsões vinculadas (docs/PROJECTION_ENGINE.md §2).
+    const goals = goalsWithDeductions(data.goals, data.plannedExpenses);
     const proj = project({ ...input, horizon: DEFAULT_HORIZON });
-    const long = project({ ...input, horizon: requiredHorizon(data.goals, startMonth) });
+    const long = project({ ...input, horizon: requiredHorizon(goals, startMonth) });
     const plan = planGoals(
-      data.goals,
+      goals,
       currentNetWorth(data),
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
       startMonth,
@@ -78,7 +80,7 @@ function Analises() {
     const wealthByMonth = new Map(
       projectedWealth(
         proj.map((p) => ({ month: p.month, netWorth: p.netWorth })),
-        data.goals,
+        goals,
         plan
       ).map((w) => [w.month, w.netWorth])
     );
