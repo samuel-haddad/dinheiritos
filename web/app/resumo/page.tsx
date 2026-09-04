@@ -352,7 +352,7 @@ function Resumo() {
         <Kpi title="Receitas totais" value={brl.format(income)} g="receitas" />
         <Kpi title="Despesas totais" value={brl.format(expense)} g="despesas" />
         <Kpi title="Saldo livre" value={brl.format(free)} g="saldo-livre" tone={free >= 0 ? 'good' : 'bad'} />
-        <Kpi title="Patrimônio projetado" value={brl.format(wealth)} g="patrimonio" tone="accent" />
+        <Kpi title="Patrimônio projetado" value={brl.format(wealth)} g="patrimonio" tone={wealth >= 0 ? 'good' : 'bad'} />
       </div>
 
       {/* Fluxo de caixa diário */}

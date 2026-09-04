@@ -95,7 +95,7 @@ function Dashboard() {
         <Kpi title="Despesas" value={brl.format(cur.totalExpenses)} g="despesas" />
         <Kpi title="Saldo livre" value={brl.format(cur.freeBalance)} g="saldo-livre"
           tone={cur.freeBalance >= 0 ? 'good' : 'bad'} />
-        <Kpi title="Patrimônio projetado" value={brl.format(curWealth.netWorth)} g="patrimonio" tone="accent" />
+        <Kpi title="Patrimônio projetado" value={brl.format(curWealth.netWorth)} g="patrimonio" tone={curWealth.netWorth >= 0 ? 'good' : 'bad'} />
       </MonthSection>
 
       <MonthSection label="Próximo mês" month={next.month} soft badge="projeção">
@@ -103,7 +103,7 @@ function Dashboard() {
         <Kpi title="Despesas" value={brl.format(next.totalExpenses)} g="despesas" soft />
         <Kpi title="Saldo livre" value={brl.format(next.freeBalance)} g="saldo-livre"
           tone={next.freeBalance >= 0 ? 'good' : 'bad'} soft />
-        <Kpi title="Patrimônio projetado" value={brl.format(nextWealth.netWorth)} g="patrimonio" tone="accent" soft />
+        <Kpi title="Patrimônio projetado" value={brl.format(nextWealth.netWorth)} g="patrimonio" tone={nextWealth.netWorth >= 0 ? 'good' : 'bad'} soft />
       </MonthSection>
 
       {view.plan.alerts.length > 0 && (
