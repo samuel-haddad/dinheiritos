@@ -48,7 +48,7 @@ function Dashboard() {
     };
     const projections = project({ ...engineInput, horizon: DEFAULT_HORIZON });
     // Metas com o alvo líquido de previsões vinculadas (docs/PROJECTION_ENGINE.md §2).
-    const goals = goalsWithDeductions(data.goals, data.plannedExpenses);
+    const goals = goalsWithDeductions(data.goals, data.plannedExpenses, startMonth);
     // simulação de metas precisa alcançar o último prazo ativo
     const long = project({ ...engineInput, horizon: requiredHorizon(goals, startMonth) });
     const plan = planGoals(

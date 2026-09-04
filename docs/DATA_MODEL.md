@@ -176,9 +176,11 @@ Campos calculados (posição atual, faltante, aporte mínimo, status/alcance) **
 
 **Alvo líquido de previsões vinculadas** (migration 0012, `planned_expenses.goal_id`): assim
 como a posição, o alvo efetivamente usado no motor também é **calculado, não persistido** —
-`target_amount` na coluna continua sendo o valor original que o usuário definiu. Toda previsão
-ativa vinculada a uma meta deduz seu `total_amount` desse alvo (piso em 0) antes de qualquer
-cálculo de posição/aporte/status; ver `docs/PROJECTION_ENGINE.md` §2.
+`target_amount` na coluna continua sendo o valor original que o usuário definiu (Meta).
+Só a parte já **Realizada** das previsões vinculadas (parcelas cujo mês já ocorreu) deduz
+esse alvo (piso em 0) antes de qualquer cálculo de posição/aporte/status — não o **Previsto**
+total (realizado + a realizar). A tela de Metas exibe as duas grandezas separadamente; ver
+`docs/PROJECTION_ENGINE.md` §2.
 
 ## Acesso
 

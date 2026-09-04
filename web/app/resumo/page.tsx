@@ -220,7 +220,7 @@ function Resumo() {
       cardBills: data.cardBills,
     };
     // Metas com o alvo líquido de previsões vinculadas (docs/PROJECTION_ENGINE.md §2).
-    const goals = goalsWithDeductions(data.goals, data.plannedExpenses);
+    const goals = goalsWithDeductions(data.goals, data.plannedExpenses, startMonth);
     const proj = project({ ...engineInput, horizon: DEFAULT_HORIZON + 1 });
     const long = project({ ...engineInput, horizon: requiredHorizon(goals, startMonth) });
     const plan = planGoals(
