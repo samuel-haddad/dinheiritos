@@ -152,7 +152,6 @@ function Lancamentos() {
           { key: 'total_amount', label: 'Valor total (R$)', type: 'money', required: true },
           { key: 'installments', label: 'Parcelas', type: 'int', required: true, help: '1 = à vista' },
           { key: 'start_month', label: 'Primeira parcela', type: 'month', required: true },
-          { key: 'due_day', label: 'Dia de vencimento da parcela', type: 'int', help: 'Usado no fluxo de caixa diário (Resumo Mensal). Sem preencher, assume dia 1.' },
           { key: 'profile_id', label: 'Responsável', type: 'select', options: profOpts, required: true },
           { key: 'confirmed', label: 'Compromisso confirmado', type: 'checkbox' },
           { key: 'is_card_expense', label: 'Cartão', type: 'checkbox' },
@@ -163,6 +162,23 @@ function Lancamentos() {
             options: cardOpts,
             showIf: (f) => Boolean(f.is_card_expense),
             help: 'Quando a fatura do mês já tiver sido lançada, a parcela some do cálculo naquele mês (já está na fatura real).',
+          },
+          {
+            key: 'due_day',
+            label: 'Dia de vencimento da parcela',
+            type: 'int',
+            disabled: (f) => Boolean(f.is_card_expense) && Boolean(f.credit_card_id),
+            // Previsão vinculada a cartão: o dia segue sempre o vencimento do cartão — não é
+            // editável separadamente. Sem vínculo, o dia continua livre para o usuário escolher.
+            deriveFrom: (f) => {
+              if (!f.is_card_expense || !f.credit_card_id) return undefined;
+              const card = cards.find((c) => c.id === f.credit_card_id);
+              return card?.due_day != null ? String(card.due_day) : '';
+            },
+            help: (f) =>
+              f.is_card_expense && f.credit_card_id
+                ? 'Sincronizado automaticamente com o dia de vencimento do cartão vinculado.'
+                : 'Usado no fluxo de caixa diário (Resumo Mensal). Sem preencher, assume dia 1.',
           },
           {
             key: 'goal_id',
@@ -202,12 +218,16 @@ function Lancamentos() {
           const n = Math.max(1, Number(row.installments) || 1);
           if (!row.total_amount || !row.start_month) return 'Preencha valor total e primeira parcela.';
           if (row.is_card_expense && !row.credit_card_id) return 'Selecione o cartão vinculado.';
+          // Reforço: o dia de uma previsão vinculada a cartão sempre segue o vencimento do
+          // cartão (já sincronizado na UI via deriveFrom) — nunca o que o usuário digitou antes.
+          const linkedCard = row.is_card_expense ? cards.find((c) => c.id === row.credit_card_id) : null;
           return {
             ...row,
             installments: n,
             installment_amount: Math.round((Number(row.total_amount) / n) * 100) / 100,
             end_month: addMonths(String(row.start_month), n),
             credit_card_id: row.is_card_expense ? row.credit_card_id : null,
+            due_day: linkedCard ? linkedCard.due_day : row.due_day,
           };
         },
       },

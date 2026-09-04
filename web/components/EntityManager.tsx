@@ -17,9 +17,29 @@ export interface FieldDef {
   type: 'text' | 'money' | 'int' | 'month' | 'date' | 'select' | 'checkbox';
   options?: Option[];
   required?: boolean;
-  help?: string;
+  help?: string | ((form: Record<string, any>) => string);
   /** Mostra o campo só quando o predicado (sobre o form atual) é verdadeiro. */
   showIf?: (form: Record<string, any>) => boolean;
+  /** Desabilita a edição do campo quando o predicado (sobre o form atual) é verdadeiro. */
+  disabled?: (form: Record<string, any>) => boolean;
+  /**
+   * Deriva o valor do campo a partir do form atual, reaplicado a cada mudança de
+   * qualquer campo. Retornar `undefined` deixa o valor atual como está (não deriva).
+   * Use junto de `disabled` para sincronizar um campo com outro (ex.: dia da parcela
+   * com o vencimento do cartão vinculado).
+   */
+  deriveFrom?: (form: Record<string, any>) => any;
+}
+
+/** Reaplica toda derivação de campo (`FieldDef.deriveFrom`) sobre o form atual. */
+function applyDerivations(fields: FieldDef[], form: Record<string, any>): Record<string, any> {
+  let next = form;
+  for (const fd of fields) {
+    if (!fd.deriveFrom) continue;
+    const v = fd.deriveFrom(next);
+    if (v !== undefined && next[fd.key] !== v) next = { ...next, [fd.key]: v };
+  }
+  return next;
 }
 
 export interface ColumnDef {
@@ -246,7 +266,7 @@ export default function EntityManager({
           className="btn-primary ml-auto"
           onClick={() => {
             setEditingId(null);
-            setForm(toForm(config.fields, config.defaults));
+            setForm(applyDerivations(config.fields, toForm(config.fields, config.defaults)));
           }}
         >
           <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor">
@@ -338,7 +358,7 @@ export default function EntityManager({
                       title="Editar"
                       onClick={() => {
                         setEditingId(r.id);
-                        setForm(toForm(config.fields, r));
+                        setForm(applyDerivations(config.fields, toForm(config.fields, r)));
                       }}
                     >
                       <EditIcon />
@@ -382,7 +402,8 @@ export default function EntityManager({
                       <select
                         className="input"
                         value={form[fd.key]}
-                        onChange={(e) => setForm({ ...form, [fd.key]: e.target.value })}
+                        disabled={fd.disabled?.(form)}
+                        onChange={(e) => setForm(applyDerivations(config.fields, { ...form, [fd.key]: e.target.value }))}
                       >
                         <option value="">—</option>
                         {fd.options?.map((o) => (
@@ -397,7 +418,8 @@ export default function EntityManager({
                       <input
                         type="checkbox"
                         checked={Boolean(form[fd.key])}
-                        onChange={(e) => setForm({ ...form, [fd.key]: e.target.checked })}
+                        disabled={fd.disabled?.(form)}
+                        onChange={(e) => setForm(applyDerivations(config.fields, { ...form, [fd.key]: e.target.checked }))}
                         style={{ width: 17, height: 17, accentColor: 'var(--accent)' }}
                       />
                       {fd.label}
@@ -413,11 +435,16 @@ export default function EntityManager({
                         type={fd.type === 'month' ? 'month' : fd.type === 'date' ? 'date' : 'text'}
                         inputMode={fd.type === 'money' || fd.type === 'int' ? 'decimal' : undefined}
                         value={form[fd.key]}
-                        onChange={(e) => setForm({ ...form, [fd.key]: e.target.value })}
+                        disabled={fd.disabled?.(form)}
+                        onChange={(e) => setForm(applyDerivations(config.fields, { ...form, [fd.key]: e.target.value }))}
                       />
                     </>
                   )}
-                  {fd.help && <span className="mt-1 block text-[11px]" style={{ color: 'var(--muted)' }}>{fd.help}</span>}
+                  {fd.help && (
+                    <span className="mt-1 block text-[11px]" style={{ color: 'var(--muted)' }}>
+                      {typeof fd.help === 'function' ? fd.help(form) : fd.help}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

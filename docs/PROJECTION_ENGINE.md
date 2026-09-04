@@ -195,6 +195,12 @@ casos específicos. As mesmas regras de vigência/periodicidade de `project()` (
 (`suppressedByCardBill`, §1) valem aqui — os dois motores reusam os mesmos helpers para não
 divergir.
 
+Previsão vinculada a cartão (`is_card_expense = true`): o `due_day` dela é sincronizado com
+`credit_cards.due_day` do cartão vinculado — o app não permite editá-lo separadamente
+(`EntityManager`, `deriveFrom`/`disabled` do campo em `web/app/lancamentos/page.tsx`). Faz
+sentido: enquanto não suprimida, a parcela é uma despesa que vai para a fatura desse cartão,
+então vence junto com ela.
+
 ```
 saldo(dia 0) = saldo em contas no início do mês
 saldo(dia D) = saldo(dia D−1) + Σ receitas do dia D − Σ despesas do dia D

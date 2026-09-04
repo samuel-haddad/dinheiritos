@@ -73,7 +73,7 @@ Ex.: empréstimo, obra do jardim, 13º de funcionárias. *(planilha: `previsoes`
 | active | boolean | migration 0003 (toggle Ativas/Desativadas) |
 | is_card_expense | boolean | migration 0010 — previsão vinculada a um cartão. Default `false` |
 | credit_card_id | uuid FK credit_cards null | obrigatório quando `is_card_expense = true` (migration 0010) |
-| due_day | int null | dia do mês em que a parcela vence (migration 0011). Sem valor = fluxo de caixa diário assume dia 1 |
+| due_day | int null | dia do mês em que a parcela vence (migration 0011). Sem valor = fluxo de caixa diário assume dia 1. Quando `is_card_expense = true`, o app sincroniza este campo com `credit_cards.due_day` do cartão vinculado e não permite editá-lo separadamente |
 | goal_id | uuid FK goals null | meta vinculada (migration 0012) — enquanto ativa, deduz `total_amount` do `target_amount` da meta (ver seção `goals` abaixo e `docs/PROJECTION_ENGINE.md` §2) |
 
 **Previsão vinculada a cartão:** quando `is_card_expense = true`, se o mês da parcela já
