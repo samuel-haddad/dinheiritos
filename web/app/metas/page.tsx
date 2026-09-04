@@ -12,8 +12,8 @@ import Shell from '@/components/Shell';
 import Toggle from '@/components/Toggle';
 import { AppData, brl, currentNetWorth, loadAppData, setAllocationMode } from '@/lib/data';
 import {
-  GoalHealth, GoalStatus, MonthAllocation, goalsWithDeductions, plannedDeductionsByGoal,
-  planGoals, requiredHorizon,
+  GoalHealth, GoalStatus, MonthAllocation, goalsWithDeductions, plannedRealizedByGoal,
+  plannedTotalByGoal, planGoals, requiredHorizon,
 } from '@/lib/engine/allocation';
 import { formatMonth, monthRange } from '@/lib/engine/months';
 import { defaultStartMonth, project } from '@/lib/engine/projection';
@@ -188,40 +188,43 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 }
 
 function GoalDetail({
-  s, monthly, ownerName, rawTarget, deduction, onClose,
+  s, monthly, ownerName, rawTarget, realizado, previsto, onClose,
 }: {
   s: GoalStatus;
   monthly: MonthAllocation[];
   ownerName: string;
-  /** Valor-alvo original (antes de deduzir previsões vinculadas). */
+  /** Meta: valor-alvo original (Reservado + Realizado + Faltante). */
   rawTarget: number;
-  /** Quanto do alvo original foi deduzido por previsões vinculadas. */
-  deduction: number;
+  /** Realizado: soma de previsões vinculadas com parcela já ocorrida (período ≤ mês atual). */
+  realizado: number;
+  /** Previsto: soma total das previsões vinculadas (realizado + a realizar). */
+  previsto: number;
   onClose: () => void;
 }) {
   const EPS = 0.005;
-  const target = Number(s.goal.target_amount); // já líquido de previsões vinculadas
+  const reservado = s.current; // posição do patrimônio contra o alvo já líquido do Realizado
+  const progresso = Math.round((reservado + realizado) * 100) / 100;
 
-  // Série mês a mês: posição acumulada (base) + aporte estimado do mês (topo).
-  // posição(M+1) = posição(M) + aporte(M). Vai até o mês em que conclui.
-  const series: { label: string; Posição: number; 'Aporte do mês': number }[] = [];
-  let pos = s.current;
+  // Série mês a mês: progresso acumulado (base) + aporte estimado do mês (topo), partindo
+  // de Reservado + Realizado. posição(M+1) = posição(M) + aporte(M). Vai até concluir a Meta.
+  const series: { label: string; Progresso: number; 'Aporte do mês': number }[] = [];
+  let pos = progresso;
   for (const m of monthly) {
     const aporte = m.perGoal.find((p) => p.goalId === s.goal.id)?.amount ?? 0;
-    if (pos >= target - EPS) break; // já concluída
+    if (pos >= rawTarget - EPS) break; // já concluída
     series.push({
       label: formatMonth(m.month),
-      Posição: Math.round(pos * 100) / 100,
+      Progresso: Math.round(pos * 100) / 100,
       'Aporte do mês': Math.round(aporte * 100) / 100,
     });
     pos = Math.round((pos + aporte) * 100) / 100;
     if (aporte <= EPS && series.length > 36) break; // trava de segurança
   }
   if (series.length === 0) {
-    series.push({ label: formatMonth(defaultStartMonth()), Posição: Math.min(s.current, target), 'Aporte do mês': 0 });
+    series.push({ label: formatMonth(defaultStartMonth()), Progresso: Math.min(progresso, rawTarget), 'Aporte do mês': 0 });
   }
 
-  const pct = target > 0 ? Math.min(100, (s.current / target) * 100) : 100;
+  const pct = rawTarget > 0 ? Math.min(100, (progresso / rawTarget) * 100) : 100;
   const tickEvery = Math.max(0, Math.ceil(series.length / 12) - 1);
 
   return (
@@ -231,18 +234,13 @@ function GoalDetail({
 
         <div className="rounded-2xl px-4" style={{ background: 'var(--surface-2)' }}>
           <InfoRow label="Responsável">{ownerName}</InfoRow>
-          {deduction > EPS ? (
-            <>
-              <InfoRow label="Valor-alvo original">{brl.format(rawTarget)}</InfoRow>
-              <InfoRow label="Previsto (previsões vinculadas)">− {brl.format(deduction)}</InfoRow>
-              <InfoRow label="Valor-alvo líquido">{brl.format(target)}</InfoRow>
-            </>
-          ) : (
-            <InfoRow label="Valor-alvo">{brl.format(target)}</InfoRow>
-          )}
+          <InfoRow label="Meta (valor-alvo)">{brl.format(rawTarget)}</InfoRow>
+          <InfoRow label="Reservado (saldo livre já reservado)">{brl.format(reservado)}</InfoRow>
+          {realizado > EPS && <InfoRow label="Realizado (previsões já ocorridas)">{brl.format(realizado)}</InfoRow>}
+          {previsto > EPS && <InfoRow label="Previsto (total de previsões vinculadas)">{brl.format(previsto)}</InfoRow>}
           <InfoRow label="Prazo">{formatMonth(s.goal.deadline)}</InfoRow>
-          <InfoRow label="Posição atual (do patrimônio)">
-            {brl.format(s.current)} <span className="text-xs" style={{ color: 'var(--muted)' }}>({pct.toFixed(0)}%)</span>
+          <InfoRow label="Progresso (Reservado + Realizado)">
+            {brl.format(progresso)} <span className="text-xs" style={{ color: 'var(--muted)' }}>({pct.toFixed(0)}%)</span>
           </InfoRow>
           <InfoRow label="Faltante">{brl.format(s.remaining)}</InfoRow>
           {s.remaining > EPS && <InfoRow label="Aporte mínimo">{brl.format(s.requiredMonthly)}/mês</InfoRow>}
@@ -253,8 +251,9 @@ function GoalDetail({
 
         <div>
           <p className="mb-2.5 text-xs" style={{ color: 'var(--muted)' }}>
-            Cada barra soma a <strong>posição acumulada</strong> e o <strong>aporte estimado do mês</strong>
-            {' '}(do saldo livre projetado). O topo de um mês vira a posição do mês seguinte, até cruzar o alvo.
+            Cada barra soma o <strong>progresso acumulado</strong> (Reservado + Realizado) e o{' '}
+            <strong>aporte estimado do mês</strong> (do saldo livre projetado). O topo de um mês vira
+            o progresso do mês seguinte, até cruzar a Meta.
           </p>
           <div style={{ color: 'var(--ink)' }}>
             <ResponsiveContainer width="100%" height={300}>
@@ -265,13 +264,13 @@ function GoalDetail({
                 <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
                 <Legend />
                 <ReferenceLine
-                  y={target}
+                  y={rawTarget}
                   stroke="var(--notice)"
                   strokeDasharray="4 4"
                   ifOverflow="extendDomain"
-                  label={{ value: 'Alvo', position: 'insideTopRight', fontSize: 11, fill: 'var(--notice)' }}
+                  label={{ value: 'Meta', position: 'insideTopRight', fontSize: 11, fill: 'var(--notice)' }}
                 />
-                <Bar dataKey="Posição" stackId="s" fill="var(--chart-2)" />
+                <Bar dataKey="Progresso" stackId="s" fill="var(--chart-2)" />
                 <Bar dataKey="Aporte do mês" stackId="s" fill="var(--accent)" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -284,12 +283,16 @@ function GoalDetail({
 
 // ---------- card de meta ----------
 function GoalCard({
-  s, ownerName, deduction, onOpen, onEdit, onMove, onDelete, first, last, selected, onToggleSelect, priorityMode,
+  s, ownerName, rawTarget, realizado, previsto, onOpen, onEdit, onMove, onDelete, first, last, selected, onToggleSelect, priorityMode,
 }: {
   s: GoalStatus;
   ownerName: string;
-  /** Quanto do alvo original foi deduzido por previsões vinculadas (0 = nenhuma). */
-  deduction: number;
+  /** Meta: valor-alvo original (Reservado + Realizado + Faltante). */
+  rawTarget: number;
+  /** Realizado: soma de previsões vinculadas com parcela já ocorrida (período ≤ mês atual). */
+  realizado: number;
+  /** Previsto: soma total das previsões vinculadas (realizado + a realizar). */
+  previsto: number;
   onOpen: () => void;
   onEdit: () => void;
   onMove: (dir: -1 | 1) => void;
@@ -300,8 +303,9 @@ function GoalCard({
   onToggleSelect: () => void;
   priorityMode: boolean;
 }) {
-  const target = Number(s.goal.target_amount); // já líquido de previsões vinculadas
-  const pct = target > 0 ? Math.min(100, (s.current / target) * 100) : 100;
+  const reservado = s.current; // posição do patrimônio contra o alvo já líquido do Realizado
+  const progresso = Math.round((reservado + realizado) * 100) / 100;
+  const pct = rawTarget > 0 ? Math.min(100, (progresso / rawTarget) * 100) : 100;
   const active = s.health === 'on_track' || s.health === 'late' || s.health === 'infeasible';
   const barColor = s.health === 'infeasible' ? 'var(--neg)' : 'var(--accent)';
   return (
@@ -334,11 +338,16 @@ function GoalCard({
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
           <span className="num" style={{ color: 'var(--muted)' }}>
-            {brl.format(s.current)} de {brl.format(target)} ({pct.toFixed(0)}%)
-            {deduction > 0.005 && (
-              <span className="ml-1" title="Soma das previsões ativas vinculadas a esta meta, já deduzida do alvo">
-                {' – Previsto '}
-                <strong style={{ color: 'var(--ink)' }}>{brl.format(deduction)}</strong>
+            {brl.format(progresso)} de {brl.format(rawTarget)} ({pct.toFixed(0)}%)
+            {previsto > 0.005 && (
+              <span
+                className="ml-1 text-[12px]"
+                title="Reservado: posição do patrimônio já alocada · Realizado: previsões vinculadas com parcela já ocorrida · Previsto: total de previsões vinculadas (realizado + a realizar)"
+              >
+                {' – Reservado: '}{brl.format(reservado)}
+                {' | Realizado: '}{brl.format(realizado)}
+                {' | Previsto '}
+                <strong style={{ color: 'var(--ink)' }}>{brl.format(previsto)}</strong>
               </span>
             )}
           </span>
@@ -433,10 +442,10 @@ function Goals() {
   const view = useMemo(() => {
     if (!data || !engineInput) return null;
     const refMonth = defaultStartMonth();
-    // Metas com o alvo líquido de previsões vinculadas (docs/PROJECTION_ENGINE.md §2) —
-    // `s.goal` em `plan.statuses` carrega esse alvo líquido daqui em diante; o `target_amount`
-    // bruto (para editar) continua em `data.goals`.
-    const goals = goalsWithDeductions(data.goals, data.plannedExpenses);
+    // Metas com o alvo líquido do Realizado em previsões vinculadas (docs/PROJECTION_ENGINE.md
+    // §2) — `s.goal` em `plan.statuses` carrega esse alvo líquido daqui em diante; o
+    // `target_amount` bruto (Meta, para editar e exibir) continua em `data.goals`.
+    const goals = goalsWithDeductions(data.goals, data.plannedExpenses, refMonth);
     const long = project({ ...engineInput, horizon: requiredHorizon(goals, refMonth) });
     const plan = planGoals(
       goals,
@@ -447,11 +456,20 @@ function Goals() {
     );
     const ordered = [...plan.statuses].sort((a, b) => a.goal.priority - b.goal.priority);
 
-    // Evolução projetada: posição de cada meta, mês a mês, nos próximos 24 meses.
+    // Previsto (total vinculado) e Realizado (parcelas já ocorridas) por meta — ver
+    // "Marcação do valor previsto" na tela de Metas.
+    const previsto = plannedTotalByGoal(data.plannedExpenses);
+    const realizado = plannedRealizedByGoal(data.plannedExpenses, refMonth);
+    const rawTargetById = new Map(data.goals.map((g) => [g.id, Number(g.target_amount)]));
+
+    // Evolução projetada: progresso (Reservado + Realizado) de cada meta, mês a mês, nos
+    // próximos 24 meses, até o valor-alvo original (Meta).
     const allocByMonth = new Map(
       plan.monthly.map((m) => [m.month, new Map(m.perGoal.map((p) => [p.goalId, p.amount]))])
     );
-    const runPos = new Map(plan.statuses.map((s) => [s.goal.id, s.current]));
+    const runPos = new Map(
+      plan.statuses.map((s) => [s.goal.id, s.current + (realizado.get(s.goal.id) ?? 0)])
+    );
     const evolution = monthRange(refMonth, 24).map((month) => {
       const row: Record<string, number | string> = { label: formatMonth(month) };
       const am = allocByMonth.get(month);
@@ -459,14 +477,13 @@ function Goals() {
         const cur = runPos.get(s.goal.id) ?? 0;
         row[s.goal.id] = Math.round(cur * 100) / 100;
         const add = am?.get(s.goal.id) ?? 0;
-        runPos.set(s.goal.id, Math.min(Number(s.goal.target_amount), Math.round((cur + add) * 100) / 100));
+        const cap = rawTargetById.get(s.goal.id) ?? Number(s.goal.target_amount);
+        runPos.set(s.goal.id, Math.min(cap, Math.round((cur + add) * 100) / 100));
       }
       return row;
     });
 
-    const deductions = plannedDeductionsByGoal(data.plannedExpenses);
-
-    return { plan, ordered, evolution, deductions };
+    return { plan, ordered, evolution, previsto, realizado, rawTargetById };
   }, [data, engineInput]);
 
   // Viabilidade da meta em edição/criação (5.3): simula a lista com a meta prospectiva.
@@ -488,7 +505,8 @@ function Goals() {
     };
     const simGoals = goalsWithDeductions(
       [...data.goals.filter((g) => g.id !== editing.id), prospective],
-      data.plannedExpenses
+      data.plannedExpenses,
+      refMonth
     );
     const long = project({ ...engineInput, horizon: requiredHorizon(simGoals, refMonth) });
     const plan = planGoals(
@@ -629,8 +647,8 @@ function Goals() {
             Evolução estimada das metas
           </h2>
           <p className="m-0 mb-4 text-[13px]" style={{ color: 'var(--muted)' }}>
-            Posição projetada de cada meta, mês a mês, sob a alocação do saldo livre. Cada linha sobe
-            até o valor-alvo e estabiliza quando a meta é concluída.
+            Progresso projetado de cada meta (Reservado + Realizado), mês a mês, sob a alocação do
+            saldo livre. Cada linha sobe até a Meta e estabiliza quando a meta é concluída.
           </p>
           <div style={{ color: 'var(--ink)' }}>
             <ResponsiveContainer width="100%" height={320}>
@@ -721,7 +739,9 @@ function Goals() {
             key={s.goal.id}
             s={s}
             ownerName={nameOf(s.goal.profile_id)}
-            deduction={view.deductions.get(s.goal.id) ?? 0}
+            rawTarget={view.rawTargetById.get(s.goal.id) ?? Number(s.goal.target_amount)}
+            realizado={view.realizado.get(s.goal.id) ?? 0}
+            previsto={view.previsto.get(s.goal.id) ?? 0}
             first={i === 0}
             last={i === view.ordered.length - 1}
             priorityMode={isPriority}
@@ -764,15 +784,14 @@ function Goals() {
       {detailingId && (() => {
         const sd = view.ordered.find((x) => x.goal.id === detailingId);
         if (!sd) return null;
-        const deduction = view.deductions.get(sd.goal.id) ?? 0;
-        const rawTarget = data.goals.find((g) => g.id === sd.goal.id)?.target_amount ?? sd.goal.target_amount;
         return (
           <GoalDetail
             s={sd}
             monthly={view.plan.monthly}
             ownerName={nameOf(sd.goal.profile_id)}
-            deduction={deduction}
-            rawTarget={Number(rawTarget)}
+            rawTarget={view.rawTargetById.get(sd.goal.id) ?? Number(sd.goal.target_amount)}
+            realizado={view.realizado.get(sd.goal.id) ?? 0}
+            previsto={view.previsto.get(sd.goal.id) ?? 0}
             onClose={() => setDetailingId(null)}
           />
         );

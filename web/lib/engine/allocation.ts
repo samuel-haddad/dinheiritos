@@ -49,10 +49,11 @@ export interface FreeBalancePoint {
 
 /**
  * Soma, por meta, o `total_amount` das previsões ativas vinculadas a ela
- * (`planned_expenses.goal_id`) — quanto do valor-alvo já está comprometido com gastos já
- * previstos (ex.: meta "Viagem" com previsão "Hotéis" vinculada). Ver docs/PROJECTION_ENGINE.md §2.
+ * (`planned_expenses.goal_id`) — o compromisso **total** (já realizado + a realizar) com
+ * gastos já previstos para essa meta (ex.: meta "Viagem" com previsão "Hotéis" vinculada).
+ * É o "Previsto" exibido na tela de Metas. Ver docs/PROJECTION_ENGINE.md §2.
  */
-export function plannedDeductionsByGoal(plannedExpenses: PlannedExpense[]): Map<string, number> {
+export function plannedTotalByGoal(plannedExpenses: PlannedExpense[]): Map<string, number> {
   const byGoal = new Map<string, number>();
   for (const p of plannedExpenses) {
     if (p.active && p.goal_id) {
@@ -63,20 +64,47 @@ export function plannedDeductionsByGoal(plannedExpenses: PlannedExpense[]): Map<
 }
 
 /**
- * Metas com o alvo líquido de previsões vinculadas: cada previsão ativa vinculada a uma
- * meta deduz seu `total_amount` do `target_amount` dela (piso em 0). Nada é persistido —
- * recalculado a cada carga, então apagar ou desativar a previsão devolve o valor sozinho.
- * Quando o alvo líquido chega a 0, a meta fica automaticamente `achieved` em `planGoals`
- * (`remaining = max(0, alvo − posição) = 0`, qualquer que seja a posição). Passe o
- * resultado, não `goals` cru, para `planGoals`/`distributeNetWorth`/`goalPositionsAt`/
- * `projectedWealth` sempre que houver `plannedExpenses` disponíveis — a única exceção é o
- * CRUD de metas em si (criar/editar), que deve ler/gravar o `target_amount` original.
+ * Soma, por meta, o quanto das previsões vinculadas já foi **Realizado**: parcelas cujo
+ * mês já ocorreu (mês da parcela ≤ `refMonth`). É a fração do "Previsto"
+ * (`plannedTotalByGoal`) que já efetivamente saiu do patrimônio — o restante (Previsto −
+ * Realizado) ainda vai acontecer em meses futuros. Ver docs/PROJECTION_ENGINE.md §2.
  */
-export function goalsWithDeductions(goals: Goal[], plannedExpenses: PlannedExpense[]): Goal[] {
-  const deductions = plannedDeductionsByGoal(plannedExpenses);
-  if (deductions.size === 0) return goals;
+export function plannedRealizedByGoal(plannedExpenses: PlannedExpense[], refMonth: Month): Map<string, number> {
+  const byGoal = new Map<string, number>();
+  for (const p of plannedExpenses) {
+    if (!p.active || !p.goal_id) continue;
+    // nº de parcelas com mês ∈ [start_month, refMonth] (0 se a primeira ainda não chegou)
+    const elapsed = diffMonths(p.start_month, refMonth) + 1;
+    const realizedInstallments = Math.min(p.installments, Math.max(0, elapsed));
+    if (realizedInstallments <= 0) continue;
+    const amount = r2(realizedInstallments * Number(p.installment_amount));
+    byGoal.set(p.goal_id, r2((byGoal.get(p.goal_id) ?? 0) + amount));
+  }
+  return byGoal;
+}
+
+/**
+ * Metas com o alvo líquido do que já foi **Realizado** em previsões vinculadas (piso em 0)
+ * — não do "Previsto" total. Motivo: só a parcela já ocorrida efetivamente saiu do
+ * patrimônio (o resto ainda não aconteceu, então não deve reduzir o quanto ainda precisa
+ * ser reservado). Identidade que passa a valer em toda a tela de Metas:
+ *
+ *   Meta (target_amount original) = Reservado (posição/`current`) + Realizado + Faltante
+ *
+ * Nada é persistido — recalculado a cada carga a partir de `refMonth` e das previsões
+ * ativas, então apagar/desativar a previsão ou o tempo passar (parcela vira "realizada")
+ * ajustam o alvo líquido sozinhos. Quando ele chega a 0, a meta fica automaticamente
+ * `achieved` em `planGoals` (`remaining = max(0, alvo − posição) = 0`, qualquer que seja a
+ * posição). Passe o resultado, não `goals` cru, para `planGoals`/`distributeNetWorth`/
+ * `goalPositionsAt`/`projectedWealth` sempre que houver `plannedExpenses` disponíveis — a
+ * única exceção é o CRUD de metas em si (criar/editar), que deve ler/gravar o
+ * `target_amount` original.
+ */
+export function goalsWithDeductions(goals: Goal[], plannedExpenses: PlannedExpense[], refMonth: Month): Goal[] {
+  const realized = plannedRealizedByGoal(plannedExpenses, refMonth);
+  if (realized.size === 0) return goals;
   return goals.map((g) => {
-    const ded = deductions.get(g.id);
+    const ded = realized.get(g.id);
     if (!ded) return g;
     return { ...g, target_amount: r2(Math.max(0, Number(g.target_amount) - ded)) };
   });

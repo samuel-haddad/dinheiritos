@@ -72,34 +72,52 @@ e não passam por este ajuste.
 > Sem pesos (removidos na migration 0005) e sem aportes manuais. A **posição atual** de
 > cada meta é derivada do patrimônio; o prazo codifica a necessidade de caixa.
 
-### Alvo líquido de previsões vinculadas (`goalsWithDeductions`, `lib/engine/allocation.ts`)
+### Alvo líquido de previsões vinculadas — Previsto vs. Realizado
 
 Uma previsão (`planned_expenses`) pode ser vinculada a uma meta via `goal_id` (migration
-0012). Antes de qualquer outro cálculo deste motor, `goalsWithDeductions(goals,
-plannedExpenses)` recalcula o alvo de cada meta:
+0012). Três funções em `lib/engine/allocation.ts` trabalham juntas:
 
 ```
-deduzido(meta) = Σ total_amount das previsões ativas com goal_id = meta.id
-alvo_líquido(meta) = max(0, target_amount − deduzido(meta))
+Previsto(meta)  = Σ total_amount das previsões ativas com goal_id = meta.id      (plannedTotalByGoal)
+Realizado(meta) = Σ das parcelas dessas previsões com mês da parcela ≤ refMonth  (plannedRealizedByGoal)
+alvo_líquido(meta) = max(0, target_amount − Realizado(meta))                     (goalsWithDeductions)
+```
+
+**Só o Realizado deduz o alvo — não o Previsto inteiro.** Motivo: uma parcela só sai de
+fato do patrimônio quando o mês dela chega; o resto do compromisso (Previsto − Realizado)
+ainda não aconteceu, então não deve reduzir, hoje, o quanto ainda precisa ser reservado —
+ele vai reduzindo sozinho, mês a mês, conforme as parcelas forem se tornando "realizadas".
+Isso estabelece uma identidade que passa a valer em toda a tela de Metas:
+
+```
+Meta (target_amount original) = Reservado (posição/current) + Realizado + Faltante (remaining)
 ```
 
 Exemplo: meta "Viagem para China" com `target_amount` 60.000 e uma previsão "Hotéis" de
-5.000 vinculada a ela → alvo líquido 55.000. Nada é persistido — `target_amount` na tabela
-continua com o valor original; o alvo líquido é recalculado a cada carga a partir das
-previsões ativas no momento. Por isso:
+900 em 3 parcelas de 300, vinculada a ela, com 2 parcelas já ocorridas no mês de
+referência → Realizado = 600, alvo líquido = 60.000 − 600 = 59.400. Se a meta estiver
+100% financiada, `Reservado` (posição) fecha exatamente nesses 59.400, e `Reservado +
+Realizado` = 60.000 = a Meta.
 
+Nada é persistido — `target_amount` na tabela `goals` continua com o valor original;
+Previsto e Realizado são recalculados a cada carga a partir de `refMonth` e das previsões
+ativas no momento. Por isso:
+
+- **O tempo passar já reduz o alvo sozinho** — mês a mês, mais parcelas viram "realizadas".
 - **Apagar ou desativar a previsão devolve o alvo automaticamente** — na próxima carga,
-  ela não entra mais na soma.
+  ela não entra mais nas somas.
 - **Alvo líquido em 0** faz `remaining = max(0, alvo − posição)` ser sempre 0 (a posição
   nunca é negativa), então a meta cai automaticamente em `health = 'achieved'` em
   `planGoals` — não é preciso marcar nada manualmente.
-- Previsões inativas (toggle Ativas/Desativadas em Lançamentos) não deduzem, mesmo com
-  `goal_id` preenchido — mesma regra de `active` usada no resto do motor.
+- Previsões inativas (toggle Ativas/Desativadas em Lançamentos) não entram em nenhuma das
+  duas somas, mesmo com `goal_id` preenchido — mesma regra de `active` usada no resto do
+  motor.
 
 Todo o restante deste motor (posição, AM, simulação, status) opera sobre o resultado de
 `goalsWithDeductions`, **exceto** o CRUD da própria meta (criar/editar em `/metas`), que lê
 e grava sempre o `target_amount` original — senão a dedução ficaria presa no valor editado
-e o "devolver ao apagar a previsão" deixaria de funcionar.
+e o "devolver ao apagar a previsão" deixaria de funcionar. A tela de Metas (`/metas`) exibe
+as quatro grandezas lado a lado: Meta, Reservado, Realizado e Previsto.
 
 ### Modo de distribuição (`allocation_mode`, `app_settings`, migration 0007)
 
