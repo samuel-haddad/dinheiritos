@@ -234,7 +234,7 @@ function GoalDetail({
           {deduction > EPS ? (
             <>
               <InfoRow label="Valor-alvo original">{brl.format(rawTarget)}</InfoRow>
-              <InfoRow label="Reduzido por previsões vinculadas">− {brl.format(deduction)}</InfoRow>
+              <InfoRow label="Previsto (previsões vinculadas)">− {brl.format(deduction)}</InfoRow>
               <InfoRow label="Valor-alvo líquido">{brl.format(target)}</InfoRow>
             </>
           ) : (
@@ -336,8 +336,9 @@ function GoalCard({
           <span className="num" style={{ color: 'var(--muted)' }}>
             {brl.format(s.current)} de {brl.format(target)} ({pct.toFixed(0)}%)
             {deduction > 0.005 && (
-              <span className="ml-1.5 text-[11px]" style={{ color: 'var(--muted)' }}>
-                (alvo reduzido em {brl.format(deduction)} por previsões vinculadas)
+              <span className="ml-1" title="Soma das previsões ativas vinculadas a esta meta, já deduzida do alvo">
+                {' – Previsto '}
+                <strong style={{ color: 'var(--ink)' }}>{brl.format(deduction)}</strong>
               </span>
             )}
           </span>
