@@ -10,7 +10,7 @@
 //   'priority' (Prioridade): todo o saldo livre do mês vai para a meta de maior
 //     prioridade (menor `priority`) até completá-la; o excedente cascateia para a
 //     próxima. Não há aporte mínimo nem déficit — só a ordem de prioridade importa.
-import type { AllocationMode, Goal, Month } from '../types';
+import type { AllocationMode, Goal, Month, PlannedExpense } from '../types';
 import { addMonths, diffMonths } from './months';
 
 export type GoalHealth = 'achieved' | 'paused' | 'on_track' | 'late' | 'infeasible';
@@ -45,6 +45,41 @@ const EPS = 0.005;
 export interface FreeBalancePoint {
   month: Month;
   freeBalance: number;
+}
+
+/**
+ * Soma, por meta, o `total_amount` das previsões ativas vinculadas a ela
+ * (`planned_expenses.goal_id`) — quanto do valor-alvo já está comprometido com gastos já
+ * previstos (ex.: meta "Viagem" com previsão "Hotéis" vinculada). Ver docs/PROJECTION_ENGINE.md §2.
+ */
+export function plannedDeductionsByGoal(plannedExpenses: PlannedExpense[]): Map<string, number> {
+  const byGoal = new Map<string, number>();
+  for (const p of plannedExpenses) {
+    if (p.active && p.goal_id) {
+      byGoal.set(p.goal_id, r2((byGoal.get(p.goal_id) ?? 0) + Number(p.total_amount)));
+    }
+  }
+  return byGoal;
+}
+
+/**
+ * Metas com o alvo líquido de previsões vinculadas: cada previsão ativa vinculada a uma
+ * meta deduz seu `total_amount` do `target_amount` dela (piso em 0). Nada é persistido —
+ * recalculado a cada carga, então apagar ou desativar a previsão devolve o valor sozinho.
+ * Quando o alvo líquido chega a 0, a meta fica automaticamente `achieved` em `planGoals`
+ * (`remaining = max(0, alvo − posição) = 0`, qualquer que seja a posição). Passe o
+ * resultado, não `goals` cru, para `planGoals`/`distributeNetWorth`/`goalPositionsAt`/
+ * `projectedWealth` sempre que houver `plannedExpenses` disponíveis — a única exceção é o
+ * CRUD de metas em si (criar/editar), que deve ler/gravar o `target_amount` original.
+ */
+export function goalsWithDeductions(goals: Goal[], plannedExpenses: PlannedExpense[]): Goal[] {
+  const deductions = plannedDeductionsByGoal(plannedExpenses);
+  if (deductions.size === 0) return goals;
+  return goals.map((g) => {
+    const ded = deductions.get(g.id);
+    if (!ded) return g;
+    return { ...g, target_amount: r2(Math.max(0, Number(g.target_amount) - ded)) };
+  });
 }
 
 /** Ordena metas ativas conforme o modo: por prazo (am) ou por prioridade (priority). */

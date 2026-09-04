@@ -69,6 +69,11 @@ export interface PlannedExpense {
   credit_card_id: string | null;
   /** Dia do mês em que a parcela vence (fluxo de caixa diário). Sem valor = assume dia 1. */
   due_day: number | null;
+  /**
+   * Meta vinculada: enquanto a previsão estiver ativa, seu `total_amount` é deduzido do
+   * `target_amount` da meta (calculado, nunca persistido — ver docs/PROJECTION_ENGINE.md §2).
+   */
+  goal_id: string | null;
 }
 
 export interface Account {

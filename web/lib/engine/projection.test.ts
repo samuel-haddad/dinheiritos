@@ -20,7 +20,8 @@ const card = (o: Partial<CreditCard>): CreditCard => ({
 const planned = (o: Partial<PlannedExpense>): PlannedExpense => ({
   id: 'pl1', profile_id: 'p', name: 'parc', total_amount: 300, installments: 3,
   installment_amount: 100, start_month: '2026-08-01', end_month: '2026-11-01',
-  confirmed: false, active: true, is_card_expense: false, credit_card_id: null, due_day: null, ...o,
+  confirmed: false, active: true, is_card_expense: false, credit_card_id: null, due_day: null,
+  goal_id: null, ...o,
 });
 
 const base = {

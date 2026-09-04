@@ -12,7 +12,7 @@ import InfoTip from '@/components/InfoTip';
 import RotatedTick from '@/components/ChartAxisTick';
 import Shell from '@/components/Shell';
 import { AppData, brl, currentNetWorth, loadAppData } from '@/lib/data';
-import { planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
+import { goalsWithDeductions, planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
 import { formatMonth } from '@/lib/engine/months';
 import { DEFAULT_HORIZON, defaultStartMonth, project } from '@/lib/engine/projection';
 
@@ -47,10 +47,12 @@ function Dashboard() {
       cardBills: data.cardBills,
     };
     const projections = project({ ...engineInput, horizon: DEFAULT_HORIZON });
+    // Metas com o alvo líquido de previsões vinculadas (docs/PROJECTION_ENGINE.md §2).
+    const goals = goalsWithDeductions(data.goals, data.plannedExpenses);
     // simulação de metas precisa alcançar o último prazo ativo
-    const long = project({ ...engineInput, horizon: requiredHorizon(data.goals, startMonth) });
+    const long = project({ ...engineInput, horizon: requiredHorizon(goals, startMonth) });
     const plan = planGoals(
-      data.goals,
+      goals,
       currentNetWorth(data),
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
       startMonth,
@@ -60,7 +62,7 @@ function Dashboard() {
     // (docs/PROJECTION_ENGINE.md §1). Metas "patrimonio" não afetam este número.
     const wealth = projectedWealth(
       projections.map((p) => ({ month: p.month, netWorth: p.netWorth })),
-      data.goals,
+      goals,
       plan
     );
     return { projections, plan, wealth, startMonth };

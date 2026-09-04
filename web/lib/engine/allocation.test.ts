@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { distributeNetWorth, goalPositionsAt, planGoals, projectedWealth, requiredHorizon, FreeBalancePoint } from './allocation';
+import {
+  distributeNetWorth, goalPositionsAt, goalsWithDeductions, planGoals, plannedDeductionsByGoal,
+  projectedWealth, requiredHorizon, FreeBalancePoint,
+} from './allocation';
 import { monthRange } from './months';
-import type { Goal } from '../types';
+import type { Goal, PlannedExpense } from '../types';
 
 const goal = (o: Partial<Goal>): Goal => ({
   id: 'g1', profile_id: 'p', name: 'Meta', target_amount: 10000,
   priority: 1, paused: false, start_month: '2026-01-01', deadline: '2027-01-01',
   category: 'patrimonio', ...o,
+});
+const planned = (o: Partial<PlannedExpense>): PlannedExpense => ({
+  id: 'pl1', profile_id: 'p', name: 'Previsão', total_amount: 1000, installments: 1,
+  installment_amount: 1000, start_month: '2026-08-01', end_month: '2026-09-01',
+  confirmed: false, active: true, is_card_expense: false, credit_card_id: null,
+  due_day: null, goal_id: null, ...o,
 });
 const fb = (months: number, value: number, start = '2026-07-01'): FreeBalancePoint[] =>
   monthRange(start, months).map((month) => ({ month, freeBalance: value }));
@@ -233,5 +242,61 @@ describe('requiredHorizon', () => {
   it('cap em 300 e mínimo 24', () => {
     expect(requiredHorizon([goal({ deadline: '2060-01-01' })], '2026-07-01')).toBe(300);
     expect(requiredHorizon([goal({ paused: true })], '2026-07-01')).toBe(24);
+  });
+});
+
+describe('plannedDeductionsByGoal / goalsWithDeductions — previsões vinculadas a metas', () => {
+  it('soma previsões ativas vinculadas à mesma meta', () => {
+    const ps = [
+      planned({ id: 'p1', goal_id: 'g1', total_amount: 5000 }),
+      planned({ id: 'p2', goal_id: 'g1', total_amount: 2000 }),
+      planned({ id: 'p3', goal_id: 'g2', total_amount: 1000 }),
+    ];
+    const byGoal = plannedDeductionsByGoal(ps);
+    expect(byGoal.get('g1')).toBe(7000);
+    expect(byGoal.get('g2')).toBe(1000);
+  });
+
+  it('ignora previsões inativas ou sem meta vinculada', () => {
+    const ps = [
+      planned({ id: 'p1', goal_id: 'g1', total_amount: 5000, active: false }),
+      planned({ id: 'p2', goal_id: null, total_amount: 2000 }),
+    ];
+    expect(plannedDeductionsByGoal(ps).size).toBe(0);
+  });
+
+  it('deduz o total da previsão do alvo da meta', () => {
+    const china = goal({ id: 'g1', name: 'Viagem para China', target_amount: 60000 });
+    const out = goalsWithDeductions([china], [planned({ goal_id: 'g1', total_amount: 5000, name: 'Hotéis' })]);
+    expect(out[0].target_amount).toBe(55000);
+  });
+
+  it('sem previsão vinculada, a meta não muda', () => {
+    const china = goal({ id: 'g1', target_amount: 60000 });
+    const out = goalsWithDeductions([china], []);
+    expect(out[0]).toBe(china); // sem deduções, devolve o mesmo objeto
+    expect(out[0].target_amount).toBe(60000);
+  });
+
+  it('o alvo líquido nunca fica negativo (piso em 0) mesmo com previsões acima do alvo', () => {
+    const g = goal({ id: 'g1', target_amount: 3000 });
+    const out = goalsWithDeductions([g], [planned({ goal_id: 'g1', total_amount: 5000 })]);
+    expect(out[0].target_amount).toBe(0);
+  });
+
+  it('apagar a previsão (não passar mais no array) devolve o alvo original — nada é persistido', () => {
+    const g = goal({ id: 'g1', target_amount: 60000 });
+    const withPlanned = goalsWithDeductions([g], [planned({ goal_id: 'g1', total_amount: 5000 })]);
+    expect(withPlanned[0].target_amount).toBe(55000);
+    const withoutPlanned = goalsWithDeductions([g], []);
+    expect(withoutPlanned[0].target_amount).toBe(60000);
+  });
+
+  it('alvo líquido em 0 faz a meta ficar "achieved" em planGoals, mesmo sem posição', () => {
+    const g = goal({ id: 'g1', target_amount: 3000, deadline: '2027-07-01' });
+    const netGoals = goalsWithDeductions([g], [planned({ goal_id: 'g1', total_amount: 3000 })]);
+    const plan = planGoals(netGoals, 0, fb(12, 0), '2026-07-01');
+    expect(plan.statuses[0].health).toBe('achieved');
+    expect(plan.statuses[0].remaining).toBe(0);
   });
 });

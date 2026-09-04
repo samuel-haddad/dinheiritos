@@ -10,7 +10,7 @@ import InfoTip from '@/components/InfoTip';
 import Shell from '@/components/Shell';
 import { AppData, currentAccountsBalance, currentNetWorth, loadAppData } from '@/lib/data';
 import { brl } from '@/lib/format';
-import { goalPositionsAt, planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
+import { goalPositionsAt, goalsWithDeductions, planGoals, projectedWealth, requiredHorizon } from '@/lib/engine/allocation';
 import { CashFlowResult, dailyCashFlow } from '@/lib/engine/cashflow';
 import { formatMonth, monthRange } from '@/lib/engine/months';
 import {
@@ -219,10 +219,12 @@ function Resumo() {
       creditCards: data.creditCards,
       cardBills: data.cardBills,
     };
+    // Metas com o alvo líquido de previsões vinculadas (docs/PROJECTION_ENGINE.md §2).
+    const goals = goalsWithDeductions(data.goals, data.plannedExpenses);
     const proj = project({ ...engineInput, horizon: DEFAULT_HORIZON + 1 });
-    const long = project({ ...engineInput, horizon: requiredHorizon(data.goals, startMonth) });
+    const long = project({ ...engineInput, horizon: requiredHorizon(goals, startMonth) });
     const plan = planGoals(
-      data.goals,
+      goals,
       netWorth,
       long.map((p) => ({ month: p.month, freeBalance: p.freeBalance })),
       startMonth,
@@ -230,7 +232,7 @@ function Resumo() {
     );
     const wealth = projectedWealth(
       proj.map((p) => ({ month: p.month, netWorth: p.netWorth })),
-      data.goals,
+      goals,
       plan
     );
 
@@ -239,10 +241,10 @@ function Resumo() {
     const monthWealth = wealth.find((w) => w.month === month) ?? null;
     const monthAlloc = plan.monthly.find((m) => m.month === month);
     const allocByGoal = new Map((monthAlloc?.perGoal ?? []).map((pg) => [pg.goalId, pg.amount]));
-    const positions = goalPositionsAt(data.goals, netWorth, plan.monthly, month, data.allocationMode);
+    const positions = goalPositionsAt(goals, netWorth, plan.monthly, month, data.allocationMode);
     const statusByGoal = new Map(plan.statuses.map((s) => [s.goal.id, s]));
 
-    const goalRows = data.goals
+    const goalRows = goals
       .slice()
       .sort((a, b) => a.deadline.localeCompare(b.deadline) || a.priority - b.priority)
       .map((g) => {
