@@ -15,7 +15,7 @@ import {
   GoalHealth, GoalStatus, MonthAllocation, goalsWithDeductions, plannedRealizedByGoal,
   plannedTotalByGoal, planGoals, requiredHorizon,
 } from '@/lib/engine/allocation';
-import { addMonths, formatMonth, monthRange } from '@/lib/engine/months';
+import { formatMonth, monthRange } from '@/lib/engine/months';
 import { defaultStartMonth, project } from '@/lib/engine/projection';
 import { supabase } from '@/lib/supabase';
 import type { AllocationMode, Goal, GoalCategory } from '@/lib/types';
@@ -43,8 +43,7 @@ const tooltipStyle = {
 // ---------- helpers ----------
 const toMonthInput = (m: string) => m.slice(0, 7); // '2026-07-01' -> '2026-07'
 const fromMonthInput = (v: string) => `${v}-01`;
-const DEADLINE_SHORTCUT_YEARS = [2, 5, 10];
-const deadlineShortcut = (years: number) => toMonthInput(addMonths(defaultStartMonth(), years * 12));
+const CHART_HORIZON_YEARS = [2, 5, 10];
 
 const HEALTH_LABEL: Record<GoalHealth, string> = {
   on_track: 'No prazo',
@@ -115,22 +114,6 @@ function GoalDialog({
           <Field label="Prazo">
             <input className="input" type="month" value={form.deadline}
               onChange={(e) => onChange({ ...form, deadline: e.target.value })} />
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {DEADLINE_SHORTCUT_YEARS.map((years) => {
-                const target = deadlineShortcut(years);
-                const active = form.deadline === target;
-                return (
-                  <button
-                    key={years}
-                    type="button"
-                    className={`pill-tab !px-2.5 !py-1 !text-[11px] ${active ? 'is-active' : ''}`}
-                    onClick={() => onChange({ ...form, deadline: target })}
-                  >
-                    +{years} anos
-                  </button>
-                );
-              })}
-            </div>
           </Field>
         </div>
         <Field label="Responsável">
@@ -422,6 +405,7 @@ function Goals() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [modeBusy, setModeBusy] = useState(false);
+  const [chartHorizonYears, setChartHorizonYears] = useState(2);
 
   const reload = useCallback(() => {
     loadAppData().then(setData).catch((e) => setError(String(e)));
@@ -464,7 +448,9 @@ function Goals() {
     // §2) — `s.goal` em `plan.statuses` carrega esse alvo líquido daqui em diante; o
     // `target_amount` bruto (Meta, para editar e exibir) continua em `data.goals`.
     const goals = goalsWithDeductions(data.goals, data.plannedExpenses, refMonth);
-    const long = project({ ...engineInput, horizon: requiredHorizon(goals, refMonth) });
+    const chartHorizonMonths = chartHorizonYears * 12;
+    const horizon = Math.max(requiredHorizon(goals, refMonth), chartHorizonMonths);
+    const long = project({ ...engineInput, horizon });
     const plan = planGoals(
       goals,
       currentNetWorth(data),
@@ -480,15 +466,15 @@ function Goals() {
     const realizado = plannedRealizedByGoal(data.plannedExpenses, refMonth);
     const rawTargetById = new Map(data.goals.map((g) => [g.id, Number(g.target_amount)]));
 
-    // Evolução projetada: progresso (Reservado + Realizado) de cada meta, mês a mês, nos
-    // próximos 24 meses, até o valor-alvo original (Meta).
+    // Evolução projetada: progresso (Reservado + Realizado) de cada meta, mês a mês, no
+    // horizonte escolhido (chartHorizonYears), até o valor-alvo original (Meta).
     const allocByMonth = new Map(
       plan.monthly.map((m) => [m.month, new Map(m.perGoal.map((p) => [p.goalId, p.amount]))])
     );
     const runPos = new Map(
       plan.statuses.map((s) => [s.goal.id, s.current + (realizado.get(s.goal.id) ?? 0)])
     );
-    const evolution = monthRange(refMonth, 24).map((month) => {
+    const evolution = monthRange(refMonth, chartHorizonMonths).map((month) => {
       const row: Record<string, number | string> = { label: formatMonth(month) };
       const am = allocByMonth.get(month);
       for (const s of ordered) {
@@ -502,7 +488,7 @@ function Goals() {
     });
 
     return { plan, ordered, evolution, previsto, realizado, rawTargetById };
-  }, [data, engineInput]);
+  }, [data, engineInput, chartHorizonYears]);
 
   // Viabilidade da meta em edição/criação (5.3): simula a lista com a meta prospectiva.
   const viability = useMemo<GoalStatus | null>(() => {
@@ -661,9 +647,23 @@ function Goals() {
 
       {view.ordered.length > 0 && (
         <section className="card mb-5">
-          <h2 className="font-display m-0 mb-1 text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
-            Evolução estimada das metas
-          </h2>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display m-0 text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
+              Evolução estimada das metas
+            </h2>
+            <div className="flex flex-wrap gap-1.5">
+              {CHART_HORIZON_YEARS.map((years) => (
+                <button
+                  key={years}
+                  type="button"
+                  className={`pill-tab !px-2.5 !py-1 !text-[11px] ${chartHorizonYears === years ? 'is-active' : ''}`}
+                  onClick={() => setChartHorizonYears(years)}
+                >
+                  {years} anos
+                </button>
+              ))}
+            </div>
+          </div>
           <p className="m-0 mb-4 text-[13px]" style={{ color: 'var(--muted)' }}>
             Progresso projetado de cada meta (Reservado + Realizado), mês a mês, sob a alocação do
             saldo livre. Cada linha sobe até a Meta e estabiliza quando a meta é concluída.
@@ -672,7 +672,12 @@ function Goals() {
             <ResponsiveContainer width="100%" height={320}>
               <LineChart data={view.evolution} margin={{ left: 12, bottom: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
-                <XAxis dataKey="label" tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />} interval={1} height={50} />
+                <XAxis
+                  dataKey="label"
+                  tick={<RotatedTick x={0} y={0} payload={{ value: '' }} />}
+                  interval={Math.max(0, Math.ceil(view.evolution.length / 12) - 1)}
+                  height={50}
+                />
                 <YAxis tick={axis} tickFormatter={kfmt} />
                 <Tooltip formatter={(v) => brl.format(Number(v))} contentStyle={tooltipStyle} />
                 <Legend />
