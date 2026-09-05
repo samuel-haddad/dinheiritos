@@ -15,7 +15,7 @@ import {
   GoalHealth, GoalStatus, MonthAllocation, goalsWithDeductions, plannedRealizedByGoal,
   plannedTotalByGoal, planGoals, requiredHorizon,
 } from '@/lib/engine/allocation';
-import { formatMonth, monthRange } from '@/lib/engine/months';
+import { addMonths, formatMonth, monthRange } from '@/lib/engine/months';
 import { defaultStartMonth, project } from '@/lib/engine/projection';
 import { supabase } from '@/lib/supabase';
 import type { AllocationMode, Goal, GoalCategory } from '@/lib/types';
@@ -43,6 +43,8 @@ const tooltipStyle = {
 // ---------- helpers ----------
 const toMonthInput = (m: string) => m.slice(0, 7); // '2026-07-01' -> '2026-07'
 const fromMonthInput = (v: string) => `${v}-01`;
+const DEADLINE_SHORTCUT_YEARS = [2, 5, 10];
+const deadlineShortcut = (years: number) => toMonthInput(addMonths(defaultStartMonth(), years * 12));
 
 const HEALTH_LABEL: Record<GoalHealth, string> = {
   on_track: 'No prazo',
@@ -113,6 +115,22 @@ function GoalDialog({
           <Field label="Prazo">
             <input className="input" type="month" value={form.deadline}
               onChange={(e) => onChange({ ...form, deadline: e.target.value })} />
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {DEADLINE_SHORTCUT_YEARS.map((years) => {
+                const target = deadlineShortcut(years);
+                const active = form.deadline === target;
+                return (
+                  <button
+                    key={years}
+                    type="button"
+                    className={`pill-tab !px-2.5 !py-1 !text-[11px] ${active ? 'is-active' : ''}`}
+                    onClick={() => onChange({ ...form, deadline: target })}
+                  >
+                    +{years} anos
+                  </button>
+                );
+              })}
+            </div>
           </Field>
         </div>
         <Field label="Responsável">
